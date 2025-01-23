@@ -29,8 +29,8 @@ def main_loop():
         target = move_actor(actor_pos, target, world)
         print(target)
 
-        camera_x = actor_pos[0] - screen.get_width() // 2 
-        camera_y = actor_pos[1] - screen.get_height() // 2
+        camera_x = actor_pos[0] #- screen.get_width() // 2 
+        camera_y = actor_pos[1] #- screen.get_height() // 2
             
         #camera_x = max(0, min(camera_x, MAP_WIDTH * TILE_SIZE - screen.get_width())) 
         #camera_y = max(0, min(camera_y, MAP_HEIGHT * TILE_SIZE - screen.get_height()))

@@ -1,15 +1,25 @@
 import pygame
 import random
+from noise import pnoise2
 TILE_SIZE=32
-MAP_WIDTH=50
-MAP_HEIGHT=50
+MAP_WIDTH=300 
+MAP_HEIGHT=300
+SCALE=100
 #world map
 def create_world():
     world_map = [] 
+    seed = random.randint(0, 100)
     for x in range(MAP_WIDTH): 
         column = [] 
-        for y in range(MAP_HEIGHT): 
-            terrain_difficulty = random.randint(1, 5) 
+        for y in range(MAP_HEIGHT):
+            # Generate Perlin noise value for each tile using the random seed
+            noise_value = pnoise2(x / SCALE, y / SCALE, octaves=8, persistence=0.5, lacunarity=4, repeatx=MAP_WIDTH, repeaty=MAP_HEIGHT, base=seed)
+            # Normalize the noise value to a range of 0 to 1
+            normalized_value = (noise_value + 1) / 2
+            # Map the normalized value to a range of 1 to 5
+            terrain_difficulty = int(normalized_value*10)-2
+            if terrain_difficulty < 1:
+                terrain_difficulty = 1  
             column.append(terrain_difficulty)
         world_map.append(column)
     return world_map
@@ -30,6 +40,7 @@ def move_actor(actor_pos, target, world_map):
         else:
             x, y = actor_pos[0]//TILE_SIZE, actor_pos[1]//TILE_SIZE
             speed=min(5/world_map[int(x)][int(y)],5)
+            #speed=30
             actor_pos[0] += dx / distance * speed
             actor_pos[1] += dy / distance * speed
             target=list(target)
