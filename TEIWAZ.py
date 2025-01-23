@@ -12,10 +12,11 @@ clock = pygame.time.Clock()
 FPS=24
     #loop
 def main_loop():
-    world = load_world()
-    world_rect=world.get_rect()
-    actor, actor_rect = create_actor()
-    target=None
+    world = create_world()
+    actor=pygame.image.load("assets/actor.png")
+    actor_rect=actor.get_rect()
+    actor_pos=[0,0]#screen center
+    target=[400,300]
 
     running=True
     while running:
@@ -24,12 +25,20 @@ def main_loop():
                 running = False
             if event.type == pygame.MOUSEBUTTONDOWN:
                 target=event.pos
-        target = move_actor(actor_rect, target)
+        
+        target = move_actor(actor_pos, target, world)
+        print(target)
 
+        camera_x = actor_pos[0] - screen.get_width() // 2 
+        camera_y = actor_pos[1] - screen.get_height() // 2
+            
+        #camera_x = max(0, min(camera_x, MAP_WIDTH * TILE_SIZE - screen.get_width())) 
+        #camera_y = max(0, min(camera_y, MAP_HEIGHT * TILE_SIZE - screen.get_height()))
         screen.fill((0, 0, 0))
-        screen.blit(world, world_rect)
-        screen.blit(actor, actor_rect)
-
+        render_world(screen, world, camera_x, camera_y)
+        screen.blit(actor, (screen.get_width() // 2 - actor_rect.width // 2, screen.get_height() // 2 - actor_rect.height // 2))
+        if target:
+            pygame.draw.circle(screen, (0, 255, 0), (target[0], target[1]), 5)
         pygame.display.flip()
         clock.tick(FPS)
     pygame.quit()
