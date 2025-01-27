@@ -12,13 +12,13 @@ def create_world():
     for x in range(MAP_WIDTH): 
         column = [] 
         for y in range(MAP_HEIGHT):
-            # Generate Perlin noise value for each tile using the random seed
+            # World generation
             noise_value = pnoise2(x / SCALE, y / SCALE, octaves=8, persistence=0.5, lacunarity=4, repeatx=MAP_WIDTH, repeaty=MAP_HEIGHT, base=seed)
-            # Normalize the noise value to a range of 0 to 1
+            # Normalize 0-1 for convinient transformation 
             normalized_value = (noise_value + 1) / 2
-            # Map the normalized value to a range of 1 to 5
+            # Map normalization (values not higher than 5, otherwise crash)
             terrain_difficulty = int(normalized_value*10)-2
-            if terrain_difficulty < 1:
+            if terrain_difficulty < 1:#fixing small values
                 terrain_difficulty = 1  
             column.append(terrain_difficulty)
         world_map.append(column)
