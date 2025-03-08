@@ -38,7 +38,8 @@ def move_actor(actor_pos, target, world_map):
         if distance < 5:
             target = [400,300]
         else:
-            x, y = actor_pos[0]//TILE_SIZE, actor_pos[1]//TILE_SIZE
+            x, y = (actor_pos[0]+400)/TILE_SIZE, (actor_pos[1]+300)/TILE_SIZE
+            print(f"X: {x}, Y: {y}")
             speed=min(5/world_map[int(x)][int(y)],5)
             #speed=30
             actor_pos[0] += dx / distance * speed
