@@ -399,7 +399,7 @@ def save_achievement_to_db(achievement_name):
         if connection and connection.is_connected():
             cursor.close()
             connection.close()
-
+#для коміту
 def load_achievements_from_db():
     connection = None
     try:
