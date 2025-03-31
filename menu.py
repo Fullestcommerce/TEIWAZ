@@ -1,5 +1,5 @@
 import pygame
-import mysql.connector  # Add this import for database operations
+import mysql.connector  #надалі не забувай імпортовувати бібліотеки
 import sys
 from logic import *
 
@@ -30,7 +30,7 @@ def main_menu(screen, clock, FPS):
                 if 300 < mouse_pos[0] < 600 and 300 < mouse_pos[1] < 350:
                     return "load_game"
                 if 300 < mouse_pos[0] < 600 and 400 < mouse_pos[1] < 450:
-                    achievements_menu(screen, clock, FPS, [])  # Pass an empty list for achievements
+                    achievements_menu(screen, clock, FPS, [])  #купи хліб з висівками
                 if 300 < mouse_pos[0] < 600 and 500 < mouse_pos[1] < 550:
                     pygame.quit()
                     sys.exit()
@@ -106,21 +106,21 @@ def pause_menu(screen, clock, FPS, action_callback=None):
 
         pygame.display.flip()
         clock.tick(FPS)
-
+#наступний код має бути в логіці, але я оголошую протест здоровому глузду
 def achievements_menu(screen, clock, FPS, achievements):
     font = pygame.font.Font(None, 36)
     running = True
 
-    # Load previously unlocked achievements from the database
+    #завантаження ачівок з БД
     unlocked_achievements = load_achievements_from_db()
-    all_achievements = list(set(unlocked_achievements + achievements))  # Combine and deduplicate
+    all_achievements = list(set(unlocked_achievements + achievements)) 
 
     while running:
-        screen.fill((0, 0, 0))  # Clear the screen
+        screen.fill((0, 0, 0)) 
         draw_text(screen, "Achievements", (300, 50), font, (255, 255, 255))
 
         if all_achievements:
-            # Display each achievement
+            #показ ачівок(виявляється :D це теж треба прописувати щоб воно працювало)
             for i, achievement in enumerate(all_achievements):
                 draw_text(screen, achievement, (50, 100 + i * 40), font, (255, 0, 0))  # Red text for achievements
         else:

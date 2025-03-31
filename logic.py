@@ -3,7 +3,7 @@ import random
 from noise import pnoise2
 import json
 import mysql.connector
-
+#Тут зараз буде 400 рядків чистого хаосу і години моєї праці
 TILE_SIZE=32
 MAP_WIDTH=300 
 MAP_HEIGHT=300
@@ -18,11 +18,11 @@ def setup_database():
         )
         cursor = connection.cursor()
 
-        # Check and create the database
+        #чек датабази і її створення якщо її німа
         cursor.execute("CREATE DATABASE IF NOT EXISTS teiwaz_game")
         cursor.execute("USE teiwaz_game")
 
-        # Create or update the saves table
+        #сіквенс на створення таблиць
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS saves (
                 id INT NOT NULL PRIMARY KEY,  -- Use id as the primary key
@@ -37,7 +37,7 @@ def setup_database():
             )
         """)
 
-        # Create or update the objects table
+        #об'єкти
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS objects (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -49,7 +49,7 @@ def setup_database():
             )
         """)
 
-        # Create or update the achievements table
+        #Ачівки
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS achievements (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -58,7 +58,7 @@ def setup_database():
             );
         """)
 
-        # Insert default achievements if they don't exist
+        #АЧІВКИ!
         default_achievements = [
             ("High Score", "Reach a score higher than 1000", False),
             ("Speed Runner", "Finish the game in under 180 seconds", False),
@@ -137,9 +137,9 @@ def move_actor(actor_pos, target, world_map):
 def save_game_to_db(save_id, seed, actor_pos, game_timer, inventory):
     connection = None
     try:
-        # Ensure save_id is an integer
+        #перевід id сейву. Нагадую, цей баг ми фіксили 5 годин ))))))
         if isinstance(save_id, str) and save_id.startswith("Slot "):
-            save_id = int(save_id.split(" ")[1])  # Extract the numeric part of "Slot X"
+            save_id = int(save_id.split(" ")[1])  #інакше збереження буде кожен раз створювати новий рядок, а не переписувати старий
 
         connection = mysql.connector.connect(
             host="localhost",
@@ -149,7 +149,7 @@ def save_game_to_db(save_id, seed, actor_pos, game_timer, inventory):
         )
         cursor = connection.cursor()
 
-        inventory_str = ",".join(inventory)  # Convert inventory to a string
+        inventory_str = ",".join(inventory)  #для зручності читання переводимо інвентар в стрінгу
 
         query = """
             INSERT INTO saves (id, save_name, seed, actor_pos_x, actor_pos_y, game_timer, inventory)
@@ -162,9 +162,9 @@ def save_game_to_db(save_id, seed, actor_pos, game_timer, inventory):
             game_timer = VALUES(game_timer),
             inventory = VALUES(inventory)
         """
-        save_name = f"Slot {save_id}"  # Generate a save name based on the id
+        save_name = f"Slot {save_id}"  #Id сейву
 
-        # Debugging: Print the values being inserted
+        #дебаг виводи для сейвів(нагадую, баг фіксився 5 годин)
         print(f"Saving game to database with values:")
         print(f"ID: {save_id}, Save Name: {save_name}, Seed: {seed}, Actor Pos: {actor_pos}, Game Timer: {game_timer}, Inventory: {inventory_str}")
 
@@ -179,7 +179,7 @@ def save_game_to_db(save_id, seed, actor_pos, game_timer, inventory):
             connection.close()
 
 
-def load_game_from_db(save_id):
+def load_game_from_db(save_id):#як не дивно ця функція запрацювала з першого разу і я її далі не фіксив
     connection = None
     try:
         connection = mysql.connector.connect(
@@ -205,7 +205,7 @@ def load_game_from_db(save_id):
             return seed, [actor_pos_x, actor_pos_y], game_timer, inventory
         else:
             print(f"No save found for slot ID: {save_id}")
-            # Return default values if no save is found
+            #повертання дефолту якщо гравець завантажить пустий сейв
             return None, [0, 0], 0, []
     except mysql.connector.Error as err:
         print(f"Error loading game: {err}")
@@ -293,52 +293,50 @@ def generate_structures(seed):
         )
         cursor = connection.cursor()
 
-        # Clean the objects table for the given seed
+        #при генерації того ж сіду треба очистити його струтури, інакше вони вже будуть досліджені і гра зламається
         cursor.execute("DELETE FROM objects WHERE seed = %s", (seed,))
 
-        # Default structures
+        #перша тестова структура яка завжди генериться на одних кордах
         structures = [
             {"type": "crash_site", "x": 320, "y": 320}
         ]
 
-        # Generate random structures
-        random.seed(seed)
+        #Генерація інших структур
+        random.seed(seed)#використання сіду забезпечує однаковий результат генерації, що дозволяє мати менші файли збереження
         num_ruins = random.randint(10, 16)
         num_charging_stations = random.randint(4, 6)
         num_fuel_depots = random.randint(4, 6)
         num_salvaged_parts = random.randint(8, 12)
         num_extraction_points = 1
 
-        # Helper function to generate random positions
         def random_position():
             return random.randint(0, MAP_WIDTH * TILE_SIZE), random.randint(0, MAP_HEIGHT * TILE_SIZE)
 
-        # Add ruins
-        for _ in range(num_ruins):
-            x, y = random_position()
+        #різноманітні об'єкти. Надалі є ідея добавити геймплейні елементи, але це фаза 2
+        for _ in range(num_ruins):#добавити можливість бою з ворогами
+            x, y = random_position()#в руїнах також будуть артефакти, за які в фінальній версії і даватимуть очки
             structures.append({"type": "ruins", "x": x, "y": y})
 
-        # Add charging stations
+        #добавити зарядку батареї ГГ
         for _ in range(num_charging_stations):
             x, y = random_position()
             structures.append({"type": "charging_station", "x": x, "y": y})
 
-        # Add fuel depots
+        #В депо необхідно буде взяти топливо для зарядки батареї і завершення гри
         for _ in range(num_fuel_depots):
             x, y = random_position()
             structures.append({"type": "fuel_depot", "x": x, "y": y})
 
-        # Add salvaged parts
+        #Біля запчастин можна буде відновити хп і патрони
         for _ in range(num_salvaged_parts):
             x, y = random_position()
             structures.append({"type": "salvaged_parts", "x": x, "y": y})
 
-        # Add extraction point
+        #лока для завершення гри
         for _ in range(num_extraction_points):
             x, y = random_position()
             structures.append({"type": "extraction_point", "x": x, "y": y})
 
-        # Insert structures into the database
         for structure in structures:
             cursor.execute("""
                 INSERT INTO objects (object_type, pos_x, pos_y, seed, discovered)
@@ -357,24 +355,23 @@ def generate_structures(seed):
 def check_achievements(score, game_timer, inventory):
     achievements = []
 
-    # Add achievements based on conditions
+    #чек ачівок
     if score > 1000:
         achievement = "High Score: Reach a score higher than 1000"
         achievements.append(achievement)
-        save_achievement_to_db(achievement)  # Save to database
+        save_achievement_to_db(achievement)
 
     if game_timer < 180:
         achievement = "Speed Runner: Finish the game in under 180 seconds"
         achievements.append(achievement)
-        save_achievement_to_db(achievement)  # Save to database
+        save_achievement_to_db(achievement)
 
     if not inventory:
         achievement = "Minimalist: Finish the game with an empty inventory"
         achievements.append(achievement)
-        save_achievement_to_db(achievement)  # Save to database
+        save_achievement_to_db(achievement)
 
-    # Return unique achievements
-    return list(set(achievements))  # Remove duplicates
+    return list(set(achievements))  #видалення дублікатів(а вони будуть)
 
 def save_achievement_to_db(achievement_name):
     connection = None
@@ -417,7 +414,7 @@ def load_achievements_from_db():
         query = "SELECT name FROM achievements"
         cursor.execute(query)
         results = cursor.fetchall()
-        return [row[0] for row in results]  # Return a list of achievement names
+        return [row[0] for row in results] 
     except mysql.connector.Error as err:
         print(f"Error loading achievements: {err}")
         return []
