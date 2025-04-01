@@ -86,26 +86,27 @@ def pause_menu(screen, clock, FPS, action_callback=None):
                 sys.exit()
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_pos = event.pos
-                if 300 < mouse_pos[0] < 600 and 200 < mouse_pos[1] < 250:  # Resume
+                if 300 < mouse_pos[0] < 600 and 200 < mouse_pos[1] < 250:  
                     return
-                if 300 < mouse_pos[0] < 600 and 300 < mouse_pos[1] < 350:  # Save Game
+                if 300 < mouse_pos[0] < 600 and 300 < mouse_pos[1] < 350:  
                     if action_callback:
-                        slot = save_slot_menu(screen, clock, FPS, "Save")  # Call save_slot_menu
+                        slot = save_slot_menu(screen, clock, FPS, "Save")  
                         if slot:
-                            action_callback("save_game", slot)  # Pass the slot to the callback
+                            action_callback("save_game", slot)  
                     return
-                if 300 < mouse_pos[0] < 600 and 400 < mouse_pos[1] < 450:  # Load Game
+                if 300 < mouse_pos[0] < 600 and 400 < mouse_pos[1] < 450:  
                     if action_callback:
                         action_callback("load_game")
                     return
-                if 300 < mouse_pos[0] < 600 and 500 < mouse_pos[1] < 550:  # Achievements
-                    achievements_menu(screen, clock, FPS)
-                if 300 < mouse_pos[0] < 600 and 600 < mouse_pos[1] < 650:  # Quit
+                if 300 < mouse_pos[0] < 600 and 500 < mouse_pos[1] < 550:
+                    achievements_menu(screen, clock, FPS, [])  #Підзагрузка ачівок(не забувай специфічну структуру)
+                if 300 < mouse_pos[0] < 600 and 600 < mouse_pos[1] < 650:  #вихід(чомусь працює 50/50. Фіксити через мій труп)
                     pygame.quit()
                     sys.exit()
 
         pygame.display.flip()
         clock.tick(FPS)
+
 #наступний код має бути в логіці, але я оголошую протест здоровому глузду
 def achievements_menu(screen, clock, FPS, achievements):
     font = pygame.font.Font(None, 36)
@@ -122,7 +123,7 @@ def achievements_menu(screen, clock, FPS, achievements):
         if all_achievements:
             #показ ачівок(виявляється :D це теж треба прописувати щоб воно працювало)
             for i, achievement in enumerate(all_achievements):
-                draw_text(screen, achievement, (50, 100 + i * 40), font, (255, 0, 0))  # Red text for achievements
+                draw_text(screen, achievement, (50, 100 + i * 40), font, (255, 0, 0))
         else:
             draw_text(screen, "No achievements yet.", (300, 200), font, (255, 255, 255))
 
@@ -153,11 +154,57 @@ def finished_game_menu(screen, clock, FPS, score):
                 sys.exit()
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_pos = event.pos
-                if 300 < mouse_pos[0] < 600 and 300 < mouse_pos[1] < 350:  # Main Menu
+                if 300 < mouse_pos[0] < 600 and 300 < mouse_pos[1] < 350:  
                     return "main_menu"
-                if 300 < mouse_pos[0] < 600 and 400 < mouse_pos[1] < 450:  # Quit
+                if 300 < mouse_pos[0] < 600 and 400 < mouse_pos[1] < 450:
                     pygame.quit()
                     sys.exit()
+
+        pygame.display.flip()
+        clock.tick(FPS)
+def login_menu(screen, clock, FPS):
+    #сетап логін меню для різних користувачів з використанням БД
+    font=pygame.font.Font(None,74)
+    input_font=pygame.font.Font(None,36)
+    running=True
+    username=""
+    password=""
+    active_input="username"
+
+    while running:
+        screen.fill((0, 0, 0))
+        draw_text(screen, "Login", (300, 100), font, (255, 255, 255))
+        draw_text(screen, "Username:", (100, 200), input_font, (255, 255, 255))
+        draw_text(screen, username, (300, 200), input_font, (255, 255, 255))
+        draw_text(screen, "Password:", (100, 300), input_font, (255, 255, 255))
+        draw_text(screen, "*" * len(password), (300, 300), input_font, (255, 255, 255))
+        draw_text(screen, "Press ENTER to Login", (200, 400), input_font, (255, 255, 255))
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN:  #ENTER ЛОГІН 
+                    if validate_login(username, password):
+                        print("Login successful!")
+                        return True
+                    else:
+                        print("Invalid username or password.")
+                        username = ""
+                        password = ""
+                elif event.key == pygame.K_TAB:  #Роблю управління на кнопках
+                    active_input = "password" if active_input == "username" else "username"
+                elif event.key == pygame.K_BACKSPACE:  # щоб було видно що я вмію так
+                    if active_input == "username":
+                        username = username[:-1]
+                    else:
+                        password = password[:-1]
+                else: 
+                    if active_input == "username":
+                        username += event.unicode
+                    else:
+                        password += event.unicode
 
         pygame.display.flip()
         clock.tick(FPS)

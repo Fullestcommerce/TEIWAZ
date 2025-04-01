@@ -8,14 +8,25 @@ TILE_SIZE=32
 MAP_WIDTH=300 
 MAP_HEIGHT=300
 SCALE=100
-def setup_database():
-    connection = None
+def get_db_connection():
+    #Функція підключення датабази(за вашим спецзамовленням)
     try:
         connection = mysql.connector.connect(
             host="localhost",
             user="root",
-            password="1111"
+            password="1111",
+            database="teiwaz_game"
         )
+        return connection
+    #добавив кондицію на помилку, також працюватиме як хороший дебаг в випадку
+    except mysql.connector.Error as err:
+        print(f"Error connecting to the database: {err}")
+        return None
+def setup_database():
+    connection = get_db_connection()
+    if not connection:#failsave на випадок помилки підключення
+        return
+    try:
         cursor = connection.cursor()
 
         #чек датабази і її створення якщо її німа
@@ -57,6 +68,24 @@ def setup_database():
             unlocked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP  -- Timestamp of when the achievement was unlocked
             );
         """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users(
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                username VARCHAR(255) NOT NULL UNIQUE,
+                password VARCHAR(255) NOT NULL     
+    )
+""")
+        #дефолтні юзери, щоб не вводити кожен раз з нуля
+        default_users = [
+            ("developer", "dungeonmaster123"),
+            ("anatoli", "pas1"),
+            ("vova", "pas2")
+        ]
+        for username, password in default_users:
+            cursor.execute("""
+                INSERT IGNORE INTO users (username, password)
+                VALUES (%s, %s)
+            """, (username, password))
 
         #АЧІВКИ!
         default_achievements = [
@@ -78,7 +107,25 @@ def setup_database():
         if connection and connection.is_connected():
             cursor.close()
             connection.close()
+def validate_login(username, password):
+    """Validate the username and password against the database."""
+    connection = get_db_connection()
+    if not connection:
+        return False
 
+    try:
+        cursor = connection.cursor()
+        query = "SELECT COUNT(*) FROM users WHERE username = %s AND password = %s"
+        cursor.execute(query, (username, password))
+        result = cursor.fetchone()
+        return result[0] > 0  #повертає 1 якщо ми залогінилися. ІНАКШЕ НІ
+    except mysql.connector.Error as err:
+        print(f"Error validating login: {err}")
+        return False
+    finally:
+        if connection.is_connected():
+            cursor.close()
+            connection.close()
 #Генератор світу
 def create_world(seed=None):
     if seed is None:
@@ -108,8 +155,8 @@ def render_world(screen, world_map, camera_x, camera_y, objects):
     
     #рендер об'єктів за типом(витяжка з бд)
     for obj in objects:
-        obj_image = pygame.image.load(f"assets/{obj['type']}.png")  # Load object image
-        screen.blit(obj_image, (obj["x"] - camera_x, obj["y"] - camera_y))  # Draw object at its position
+        obj_image = pygame.image.load(f"assets/{obj['type']}.png")  
+        screen.blit(obj_image, (obj["x"] - camera_x, obj["y"] - camera_y)) 
 
 def move_actor(actor_pos, target, world_map):
     if target:
@@ -135,18 +182,11 @@ def move_actor(actor_pos, target, world_map):
 
 
 def save_game_to_db(save_id, seed, actor_pos, game_timer, inventory):
-    connection = None
+    connection = get_db_connection()
     try:
         #перевід id сейву. Нагадую, цей баг ми фіксили 5 годин ))))))
         if isinstance(save_id, str) and save_id.startswith("Slot "):
             save_id = int(save_id.split(" ")[1])  #інакше збереження буде кожен раз створювати новий рядок, а не переписувати старий
-
-        connection = mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="1111",
-            database="teiwaz_game"
-        )
         cursor = connection.cursor()
 
         inventory_str = ",".join(inventory)  #для зручності читання переводимо інвентар в стрінгу
@@ -180,14 +220,8 @@ def save_game_to_db(save_id, seed, actor_pos, game_timer, inventory):
 
 
 def load_game_from_db(save_id):#як не дивно ця функція запрацювала з першого разу і я її далі не фіксив
-    connection = None
+    connection = get_db_connection()
     try:
-        connection = mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="1111",
-            database="teiwaz_game"
-        )
         cursor = connection.cursor()
 
         query = """
@@ -200,7 +234,7 @@ def load_game_from_db(save_id):#як не дивно ця функція зап�
         result = cursor.fetchone()
         if (result):
             seed, actor_pos_x, actor_pos_y, game_timer, inventory_str = result
-            inventory = inventory_str.split(",") if inventory_str else []  # Convert inventory string back to a list
+            inventory = inventory_str.split(",") if inventory_str else []  #перевід інвентаря в стрінгу для зручності збереження
             print(f"Data loaded: seed={seed}, actor_pos={[actor_pos_x, actor_pos_y]}, game_timer={game_timer}, inventory={inventory}")
             return seed, [actor_pos_x, actor_pos_y], game_timer, inventory
         else:
@@ -216,13 +250,8 @@ def load_game_from_db(save_id):#як не дивно ця функція зап�
             connection.close()
 
 def list_saves():
+    connection=get_db_connection()
     try:
-        connection = mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="1111",
-            database="teiwaz_game"
-        )
         cursor = connection.cursor()
         query = "SELECT save_name FROM saves"
         cursor.execute(query)
@@ -237,15 +266,9 @@ def list_saves():
             connection.close()
 
 def save_object_to_db(object_type, pos_x, pos_y):
+    connection=get_db_connection()
     try:
-        connection = mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="1111",
-            database="teiwaz_game"
-        )
         cursor = connection.cursor()
-
         query = """
             INSERT INTO objects (object_type, pos_x, pos_y)
             VALUES (%s, %s, %s)
@@ -261,13 +284,8 @@ def save_object_to_db(object_type, pos_x, pos_y):
             connection.close()
 
 def load_objects_from_db(seed):
+    connection=get_db_connection()
     try:
-        connection = mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="1111",
-            database="teiwaz_game"
-        )
         cursor = connection.cursor()
 
         query = "SELECT object_type, pos_x, pos_y, discovered FROM objects WHERE seed = %s"
@@ -283,14 +301,8 @@ def load_objects_from_db(seed):
             connection.close()
 
 def generate_structures(seed):
-    connection = None
+    connection = get_db_connection()
     try:
-        connection = mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="1111",
-            database="teiwaz_game"
-        )
         cursor = connection.cursor()
 
         #при генерації того ж сіду треба очистити його струтури, інакше вони вже будуть досліджені і гра зламається
@@ -374,14 +386,8 @@ def check_achievements(score, game_timer, inventory):
     return list(set(achievements))  #видалення дублікатів(а вони будуть)
 
 def save_achievement_to_db(achievement_name):
-    connection = None
+    connection = get_db_connection()
     try:
-        connection = mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="1111",
-            database="teiwaz_game"
-        )
         cursor = connection.cursor()
 
         query = """
@@ -401,14 +407,8 @@ def save_achievement_to_db(achievement_name):
             connection.close()
 #для коміту
 def load_achievements_from_db():
-    connection = None
+    connection = get_db_connection()
     try:
-        connection = mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="1111",
-            database="teiwaz_game"
-        )
         cursor = connection.cursor()
 
         query = "SELECT name FROM achievements"

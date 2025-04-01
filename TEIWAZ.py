@@ -128,7 +128,7 @@ def main_loop(load_saved=False, save_name=None):
             
             #тут далі перелік всіх таймерів і показників
             #рендер таймеру
-            timer_text = font.render(f"Time: {int(game_timer)}s", True, (0, 255, 0))  # Green color
+            timer_text = font.render(f"Time: {int(game_timer)}s", True, (0, 255, 0)) 
             screen.blit(timer_text, (10, 10)) 
 
             # корди
@@ -183,10 +183,11 @@ def end_game(inventory, game_timer):
 
 #гарно гарно
 if __name__ == "__main__":
-    act = main_menu(screen, clock, FPS)
-    if act == "new_game":
-        main_loop(load_saved=False)
-    elif act:
-        main_loop(load_saved=True, save_name=act)
+    if login_menu(screen, clock, FPS):
+        act = main_menu(screen, clock, FPS)
+        if act == "new_game":
+            main_loop(load_saved=False)
+        elif act:
+            main_loop(load_saved=True, save_name=act)
     pygame.quit()
     sys.exit()
