@@ -4,17 +4,19 @@ import sys
 from menu import *
 from logic import *
 pygame.init()
-    #параметри екрану
+
+#параметри екрану
 screen = pygame.display.set_mode((800, 600))
 pygame.display.set_caption("TEIWAZ v_0.1")
-    #фреймрейт(поки визначає тільки швидкість оновлення кадрів при динамічному рухові)
+
+#фреймрейт
 clock = pygame.time.Clock()
-FPS=24
+FPS = 24
 
 #чек БД
 setup_database()
 
-    #основний цикл
+#основний цикл
 def main_loop(load_saved=False, save_name=None):
     if load_saved:
         # вибір сейв слоту(спочатку забув прописати і потім годину думав чому воно не працює)
@@ -100,16 +102,23 @@ def main_loop(load_saved=False, save_name=None):
                             min_distance = distance_to_obj
                             closest_obj = obj
                     if closest_obj and min_distance < TILE_SIZE:
-                        if closest_obj["type"] != "extraction_point":
-                            interaction_result = f"You salvaged a {closest_obj['type']}!"
-                            inventory.append(closest_obj["type"])  #в разі успіху додає предмет(локацію, але мені поки лінь робити окремі предмети)
-                            closest_obj["discovered"] = True  #І змінює статус об'єкту щоб ми більше не змогли підібрати його
-                            print(interaction_result)
+                        if closest_obj["discovered"]:
+                            print(f"You have already explored the {closest_obj['type']} at ({closest_obj['x']}, {closest_obj['y']}).")
                         else:
-                            print("You reached the extraction point!")
-                            #кінець гри
-                            end_game(inventory, game_timer)
-                        target = None  #зупиняє рух після взаємодії. Ну бо не треба.
+                            if closest_obj["type"] != "extraction_point":
+                                interaction_result = f"You salvaged a {closest_obj['type']}!"
+                                inventory.append(closest_obj["type"])
+                                closest_obj["discovered"] = True  # Позначаємо об'єкт як досліджений
+                                mark_object_as_discovered(closest_obj["id"])  # Оновлюємо стан у базі даних
+                                print(interaction_result)
+
+                                # Виклик додаткового вікна дослідження
+                                exploration_window(closest_obj["type"])
+                            else:
+                                print("You reached the extraction point!")
+                                # Кінець гри
+                                end_game(inventory, game_timer)
+                            target = None
                     else:
                         print("No objects nearby to interact with.")
 
@@ -183,11 +192,10 @@ def end_game(inventory, game_timer):
 
 #гарно гарно
 if __name__ == "__main__":
-    if login_menu(screen, clock, FPS):
-        act = main_menu(screen, clock, FPS)
-        if act == "new_game":
-            main_loop(load_saved=False)
-        elif act:
-            main_loop(load_saved=True, save_name=act)
+    act = main_menu(screen, clock, FPS)
+    if act == "new_game":
+        main_loop(load_saved=False)
+    elif act:
+        main_loop(load_saved=True, save_name=act)
     pygame.quit()
     sys.exit()

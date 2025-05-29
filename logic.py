@@ -284,14 +284,14 @@ def save_object_to_db(object_type, pos_x, pos_y):
             connection.close()
 
 def load_objects_from_db(seed):
-    connection=get_db_connection()
+    connection = get_db_connection()
     try:
         cursor = connection.cursor()
 
-        query = "SELECT object_type, pos_x, pos_y, discovered FROM objects WHERE seed = %s"
+        query = "SELECT id, object_type, pos_x, pos_y, discovered FROM objects WHERE seed = %s"
         cursor.execute(query, (seed,))
         objects = cursor.fetchall()
-        return [{"type": obj[0], "x": obj[1], "y": obj[2], "discovered": obj[3]} for obj in objects]
+        return [{"id": obj[0], "type": obj[1], "x": obj[2], "y": obj[3], "discovered": obj[4]} for obj in objects]
     except mysql.connector.Error as err:
         print(f"Error: {err}")
         return []
@@ -418,6 +418,20 @@ def load_achievements_from_db():
     except mysql.connector.Error as err:
         print(f"Error loading achievements: {err}")
         return []
+    finally:
+        if connection and connection.is_connected():
+            cursor.close()
+            connection.close()
+def mark_object_as_discovered(object_id):
+    connection = get_db_connection()
+    try:
+        cursor = connection.cursor()
+        query = "UPDATE objects SET discovered = TRUE WHERE id = %s"
+        cursor.execute(query, (object_id,))
+        connection.commit()
+        print(f"Object with ID {object_id} marked as discovered.")
+    except mysql.connector.Error as err:
+        print(f"Error updating object: {err}")
     finally:
         if connection and connection.is_connected():
             cursor.close()

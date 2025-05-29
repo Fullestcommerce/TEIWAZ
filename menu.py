@@ -162,14 +162,7 @@ def finished_game_menu(screen, clock, FPS, score):
 
         pygame.display.flip()
         clock.tick(FPS)
-def login_menu(screen, clock, FPS):
-    #сетап логін меню для різних користувачів з використанням БД
-    font=pygame.font.Font(None,74)
-    input_font=pygame.font.Font(None,36)
-    running=True
-    username=""
-    password=""
-    active_input="username"
+
 
     while running:
         screen.fill((0, 0, 0))
@@ -208,3 +201,29 @@ def login_menu(screen, clock, FPS):
 
         pygame.display.flip()
         clock.tick(FPS)
+
+def exploration_window(location_name):
+    exploration_screen = pygame.display.set_mode((400, 300))  # Create a new window
+    pygame.display.set_caption(f"Exploring: {location_name}")
+    font = pygame.font.Font(None, 36)
+    running = True
+
+    while running:
+        exploration_screen.fill((0, 0, 0))
+        text = font.render(f"Exploring: {location_name}", True, (255, 255, 255))
+        exploration_screen.blit(text, (50, 50))
+
+        exit_text = font.render("Press ESC to close", True, (255, 255, 255))
+        exploration_screen.blit(exit_text, (50, 200))
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                running = False
+
+        pygame.display.flip()
+
+    # Close the exploration window and return to the main game
+    pygame.display.set_mode((800, 600))  # Restore the main game window
+    pygame.display.set_caption("TEIWAZ v_0.1")
