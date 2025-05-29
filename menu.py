@@ -203,18 +203,24 @@ def finished_game_menu(screen, clock, FPS, score):
         clock.tick(FPS)
 
 def exploration_window(location_name):
-    exploration_screen = pygame.display.set_mode((400, 300))  # Create a new window
+    exploration_screen = pygame.display.set_mode((800, 600))  # Match main game window size
     pygame.display.set_caption(f"Exploring: {location_name}")
     font = pygame.font.Font(None, 36)
     running = True
 
+    # Generate the exploration map
+    seed = random.randint(0, 100)  # Use a random seed for now
+    exploration_map = generate_exploration_map(seed)
+
     while running:
         exploration_screen.fill((0, 0, 0))
+        render_exploration_map(exploration_screen, exploration_map)
+
         text = font.render(f"Exploring: {location_name}", True, (255, 255, 255))
-        exploration_screen.blit(text, (50, 50))
+        exploration_screen.blit(text, (10, 10))
 
         exit_text = font.render("Press ESC to close", True, (255, 255, 255))
-        exploration_screen.blit(exit_text, (50, 200))
+        exploration_screen.blit(exit_text, (10, 550))
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:

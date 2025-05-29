@@ -436,3 +436,74 @@ def mark_object_as_discovered(object_id):
         if connection and connection.is_connected():
             cursor.close()
             connection.close()
+def render_exploration_map(screen, exploration_map, tile_size=32):
+   
+    for x, column in enumerate(exploration_map):
+        for y, tile in enumerate(column):
+            if tile == "floor":
+                color = (200, 200, 200)  # Light gray for floor
+            elif tile == "wall":
+                color = (50, 50, 50)  # Dark gray for walls
+            elif tile == "hole":
+                color = (0, 0, 0)  # Black for holes
+            else:
+                color = (255, 0, 0)  # Red for unknown tiles (debugging)
+            pygame.draw.rect(screen, color, (x * tile_size, y * tile_size, tile_size, tile_size))
+
+def generate_exploration_map(seed=None, width=64, height=64):
+    if seed is None:
+        seed = random.randint(0, 100)
+    random.seed(seed)
+
+    # Initialize the map with walls
+    exploration_map = [["wall" for _ in range(height)] for _ in range(width)]
+
+    def carve_room(x, y, w, h):
+        """Carve out a rectangular room."""
+        for i in range(x, x + w):
+            for j in range(y, y + h):
+                if 0 <= i < width and 0 <= j < height:
+                    exploration_map[i][j] = "floor"
+
+    def carve_corridor(x1, y1, x2, y2):
+        """Carve out a corridor between two points."""
+        if random.choice([True, False]):
+            # Horizontal first, then vertical
+            for x in range(min(x1, x2), max(x1, x2) + 1):
+                if 0 <= x < width and 0 <= y1 < height:
+                    exploration_map[x][y1] = "floor"
+            for y in range(min(y1, y2), max(y1, y2) + 1):
+                if 0 <= x2 < width and 0 <= y < height:
+                    exploration_map[x2][y] = "floor"
+        else:
+            # Vertical first, then horizontal
+            for y in range(min(y1, y2), max(y1, y2) + 1):
+                if 0 <= x1 < width and 0 <= y < height:
+                    exploration_map[x1][y] = "floor"
+            for x in range(min(x1, x2), max(x1, x2) + 1):
+                if 0 <= x < width and 0 <= y2 < height:
+                    exploration_map[x][y2] = "floor"
+
+    # Generate rooms and corridors
+    num_rooms = random.randint(8, 12)
+    rooms = []
+    for _ in range(num_rooms):
+        room_width = random.randint(5, 10)
+        room_height = random.randint(5, 10)
+        room_x = random.randint(1, width - room_width - 1)
+        room_y = random.randint(1, height - room_height - 1)
+        carve_room(room_x, room_y, room_width, room_height)
+        rooms.append((room_x + room_width // 2, room_y + room_height // 2))  # Store room center
+
+    # Connect rooms with corridors
+    for i in range(len(rooms) - 1):
+        carve_corridor(rooms[i][0], rooms[i][1], rooms[i + 1][0], rooms[i + 1][1])
+
+    # Add random holes (optional)
+    num_holes = random.randint(5, 10)
+    for _ in range(num_holes):
+        hole_x = random.randint(0, width - 1)
+        hole_y = random.randint(0, height - 1)
+        exploration_map[hole_x][hole_y] = "hole"
+
+    return exploration_map
