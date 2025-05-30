@@ -1,6 +1,8 @@
-import pygame
 import mysql.connector  #надалі не забувай імпортовувати бібліотеки
 import sys
+import random
+import pygame
+import math
 from logic import *
 
 #Нагадую, все працює на костилях і через зад, не лізь лишній раз в код меню
@@ -203,33 +205,92 @@ def finished_game_menu(screen, clock, FPS, score):
         clock.tick(FPS)
 
 def exploration_window(location_name):
-    exploration_screen = pygame.display.set_mode((800, 600))  # Match main game window size
+    pygame.init()
+    screen_width, screen_height = 800, 600
+    exploration_screen = pygame.display.set_mode((screen_width, screen_height))
     pygame.display.set_caption(f"Exploring: {location_name}")
-    font = pygame.font.Font(None, 36)
-    running = True
 
-    # Generate the exploration map
-    seed = random.randint(0, 100)  # Use a random seed for now
-    exploration_map = generate_exploration_map(seed)
+    # Map (1 = wall, 0 = empty space)
+    game_map = [
+        [1, 1, 1, 1, 1, 1, 1, 1],
+        [1, 0, 0, 0, 0, 0, 0, 1],
+        [1, 0, 1, 0, 1, 0, 0, 1],
+        [1, 0, 1, 0, 1, 0, 0, 1],
+        [1, 0, 0, 0, 0, 0, 0, 1],
+        [1, 1, 1, 1, 1, 1, 1, 1],
+    ]
+
+    tile_size = 64  # Size of each map tile
+    fov = math.pi / 3  # Field of view (60 degrees)
+    num_rays = 120  # Number of rays to cast
+    max_depth = 800  # Maximum depth of raycasting
+    ray_step = fov / num_rays  # Angle between each ray
+
+    # Player properties
+    player_x, player_y = 150, 150  # Player's position
+    player_angle = 0  # Player's viewing angle
+    player_speed = 3  # Movement speed
+    rotation_speed = 0.05  # Rotation speed
+
+    running = True
+    clock = pygame.time.Clock()
+
+    def cast_rays():
+        """Cast rays and render the 3D environment."""
+        for ray in range(num_rays):
+            ray_angle = player_angle - (fov / 2) + (ray * ray_step)
+            sin_a = math.sin(ray_angle)
+            cos_a = math.cos(ray_angle)
+
+            depth = 0
+            hit = False
+            while not hit and depth < max_depth:
+                depth += 1
+                target_x = int((player_x + cos_a * depth) / tile_size)
+                target_y = int((player_y + sin_a * depth) / tile_size)
+
+                if target_x < 0 or target_x >= len(game_map[0]) or target_y < 0 or target_y >= len(game_map):
+                    break  # Out of bounds
+                if game_map[target_y][target_x] == 1:
+                    hit = True
+
+            # Calculate wall height based on depth
+            if hit:
+                wall_height = int(screen_height / (depth * 0.01))
+                color = (255 - min(depth, 255), 255 - min(depth, 255), 255 - min(depth, 255))  # Darken with distance
+                pygame.draw.rect(exploration_screen, color, (ray * (screen_width // num_rays), (screen_height // 2) - (wall_height // 2), (screen_width // num_rays), wall_height))
 
     while running:
-        exploration_screen.fill((0, 0, 0))
-        render_exploration_map(exploration_screen, exploration_map)
+        exploration_screen.fill((0, 0, 0))  # Clear the screen
 
-        text = font.render(f"Exploring: {location_name}", True, (255, 255, 255))
-        exploration_screen.blit(text, (10, 10))
-
-        exit_text = font.render("Press ESC to close", True, (255, 255, 255))
-        exploration_screen.blit(exit_text, (10, 550))
-
+        # Handle events
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                running = False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:  # Exit exploration screen
+                    running = False
 
+        # Handle movement
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_w]:  # Move forward
+            player_x += math.cos(player_angle) * player_speed
+            player_y += math.sin(player_angle) * player_speed
+        if keys[pygame.K_s]:  # Move backward
+            player_x -= math.cos(player_angle) * player_speed
+            player_y -= math.sin(player_angle) * player_speed
+        if keys[pygame.K_a]:  # Rotate left
+            player_angle -= rotation_speed
+        if keys[pygame.K_d]:  # Rotate right
+            player_angle += rotation_speed
+
+        # Cast rays and render the environment
+        cast_rays()
+
+        # Update the display
         pygame.display.flip()
+        clock.tick(60)  # Limit to 60 FPS
 
-    # Close the exploration window and return to the main game
-    pygame.display.set_mode((800, 600))  # Restore the main game window
+    # Restore the main game display
+    pygame.display.set_mode((800, 600))
     pygame.display.set_caption("TEIWAZ v_0.1")

@@ -56,9 +56,23 @@ def setup_database():
                 pos_x INT NOT NULL,
                 pos_y INT NOT NULL,
                 seed INT NOT NULL,
-                discovered BOOLEAN DEFAULT FALSE
+                discovered BOOLEAN DEFAULT FALSE,
+                discovered_1 BOOLEAN DEFAULT FALSE,
+                discovered_2 BOOLEAN DEFAULT FALSE,
+                discovered_3 BOOLEAN DEFAULT FALSE
             )
         """)
+        cursor.execute("SHOW COLUMNS FROM objects LIKE 'discovered_1'")
+        if not cursor.fetchone():
+            cursor.execute("ALTER TABLE objects ADD COLUMN discovered_1 BOOLEAN DEFAULT FALSE")
+
+        cursor.execute("SHOW COLUMNS FROM objects LIKE 'discovered_2'")
+        if not cursor.fetchone():
+            cursor.execute("ALTER TABLE objects ADD COLUMN discovered_2 BOOLEAN DEFAULT FALSE")
+
+        cursor.execute("SHOW COLUMNS FROM objects LIKE 'discovered_3'")
+        if not cursor.fetchone():
+            cursor.execute("ALTER TABLE objects ADD COLUMN discovered_3 BOOLEAN DEFAULT FALSE")
 
         #Ачівки
         cursor.execute("""
@@ -181,16 +195,16 @@ def move_actor(actor_pos, target, world_map):
 
 
 
-def save_game_to_db(save_id, seed, actor_pos, game_timer, inventory):
+def save_game_to_db(save_id, seed, actor_pos, game_timer, inventory, objects):
     connection = get_db_connection()
     try:
-        #перевід id сейву. Нагадую, цей баг ми фіксили 5 годин ))))))
         if isinstance(save_id, str) and save_id.startswith("Slot "):
-            save_id = int(save_id.split(" ")[1])  #інакше збереження буде кожен раз створювати новий рядок, а не переписувати старий
+            save_id = int(save_id.split(" ")[1])
         cursor = connection.cursor()
 
-        inventory_str = ",".join(inventory)  #для зручності читання переводимо інвентар в стрінгу
+        inventory_str = ",".join(inventory)
 
+        # Save the game state
         query = """
             INSERT INTO saves (id, save_name, seed, actor_pos_x, actor_pos_y, game_timer, inventory)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -202,13 +216,18 @@ def save_game_to_db(save_id, seed, actor_pos, game_timer, inventory):
             game_timer = VALUES(game_timer),
             inventory = VALUES(inventory)
         """
-        save_name = f"Slot {save_id}"  #Id сейву
-
-        #дебаг виводи для сейвів(нагадую, баг фіксився 5 годин)
-        print(f"Saving game to database with values:")
-        print(f"ID: {save_id}, Save Name: {save_name}, Seed: {seed}, Actor Pos: {actor_pos}, Game Timer: {game_timer}, Inventory: {inventory_str}")
-
+        save_name = f"Slot {save_id}"
         cursor.execute(query, (save_id, save_name, seed, actor_pos[0], actor_pos[1], game_timer, inventory_str))
+
+        # Update the discovered_<slot> column for the current seed
+        discovered_column = f"discovered_{save_id}"
+        query = f"""
+            UPDATE objects
+            SET {discovered_column} = discovered
+            WHERE seed = %s
+        """
+        cursor.execute(query, (seed,))
+
         connection.commit()
         print(f"Game saved successfully to slot ID: {save_id}")
     except mysql.connector.Error as err:
@@ -219,11 +238,12 @@ def save_game_to_db(save_id, seed, actor_pos, game_timer, inventory):
             connection.close()
 
 
-def load_game_from_db(save_id):#як не дивно ця функція запрацювала з першого разу і я її далі не фіксив
+def load_game_from_db(save_id):
     connection = get_db_connection()
     try:
         cursor = connection.cursor()
 
+        # Load the game state
         query = """
             SELECT seed, actor_pos_x, actor_pos_y, game_timer, inventory
             FROM saves
@@ -232,18 +252,31 @@ def load_game_from_db(save_id):#як не дивно ця функція зап�
         print(f"Loading from slot ID: {save_id}")
         cursor.execute(query, (save_id,))
         result = cursor.fetchone()
-        if (result):
+        if result:
             seed, actor_pos_x, actor_pos_y, game_timer, inventory_str = result
-            inventory = inventory_str.split(",") if inventory_str else []  #перевід інвентаря в стрінгу для зручності збереження
+            inventory = inventory_str.split(",") if inventory_str else []
+
+            # Update the discovered column for the current seed
+            discovered_column = f"discovered_{save_id}"
+            query = f"""
+                UPDATE objects
+                SET discovered = {discovered_column}
+                WHERE seed = %s
+            """
+            print(f"Executing query: {query} with seed: {seed}")
+            cursor.execute(query, (seed,))
+
+            # Load objects for the seed
+            objects = load_objects_from_db(seed)
+
             print(f"Data loaded: seed={seed}, actor_pos={[actor_pos_x, actor_pos_y]}, game_timer={game_timer}, inventory={inventory}")
-            return seed, [actor_pos_x, actor_pos_y], game_timer, inventory
+            return seed, [actor_pos_x, actor_pos_y], game_timer, inventory, objects
         else:
             print(f"No save found for slot ID: {save_id}")
-            #повертання дефолту якщо гравець завантажить пустий сейв
-            return None, [0, 0], 0, []
+            return None, [0, 0], 0, [], []
     except mysql.connector.Error as err:
         print(f"Error loading game: {err}")
-        return None, [0, 0], 0, []
+        return None, [0, 0], 0, [], []
     finally:
         if connection and connection.is_connected():
             cursor.close()
@@ -436,7 +469,7 @@ def mark_object_as_discovered(object_id):
         if connection and connection.is_connected():
             cursor.close()
             connection.close()
-def render_exploration_map(screen, exploration_map, tile_size=32):
+def render_exploration_map(screen, exploration_map, tile_size=8):
    
     for x, column in enumerate(exploration_map):
         for y, tile in enumerate(column):
@@ -484,20 +517,47 @@ def generate_exploration_map(seed=None, width=64, height=64):
                 if 0 <= x < width and 0 <= y2 < height:
                     exploration_map[x][y2] = "floor"
 
-    # Generate rooms and corridors
-    num_rooms = random.randint(8, 12)
+    # Generate rooms
+    num_rooms = random.randint(8, 15)
     rooms = []
     for _ in range(num_rooms):
         room_width = random.randint(5, 10)
         room_height = random.randint(5, 10)
         room_x = random.randint(1, width - room_width - 1)
         room_y = random.randint(1, height - room_height - 1)
-        carve_room(room_x, room_y, room_width, room_height)
-        rooms.append((room_x + room_width // 2, room_y + room_height // 2))  # Store room center
 
-    # Connect rooms with corridors
-    for i in range(len(rooms) - 1):
-        carve_corridor(rooms[i][0], rooms[i][1], rooms[i + 1][0], rooms[i + 1][1])
+        # Check for overlap with existing rooms
+        overlap = False
+        for other_room in rooms:
+            other_x, other_y, other_w, other_h = other_room
+            if (room_x < other_x + other_w and room_x + room_width > other_x and
+                    room_y < other_y + other_h and room_y + room_height > other_y):
+                overlap = True
+                break
+
+        if not overlap:
+            carve_room(room_x, room_y, room_width, room_height)
+            rooms.append((room_x, room_y, room_width, room_height))
+
+    # Connect rooms with corridors using a minimum spanning tree (MST)
+    room_centers = [(x + w // 2, y + h // 2) for x, y, w, h in rooms]
+    connected = set()
+    connected.add(0)
+    while len(connected) < len(room_centers):
+        min_distance = float('inf')
+        closest_pair = None
+        for i in connected:
+            for j in range(len(room_centers)):
+                if j not in connected:
+                    dist = ((room_centers[i][0] - room_centers[j][0]) ** 2 +
+                            (room_centers[i][1] - room_centers[j][1]) ** 2) ** 0.5
+                    if dist < min_distance:
+                        min_distance = dist
+                        closest_pair = (i, j)
+        if closest_pair:
+            i, j = closest_pair
+            carve_corridor(room_centers[i][0], room_centers[i][1], room_centers[j][0], room_centers[j][1])
+            connected.add(j)
 
     # Add random holes (optional)
     num_holes = random.randint(5, 10)
