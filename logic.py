@@ -264,7 +264,8 @@ def load_game_from_db(save_id):
                 "ammo": 10,
                 "railgun_bolts": 5,
                 "shotgun_shells": 8,
-                "current_weapon": "gun"
+                "current_weapon": "gun",
+                "artifacts": 0  # Default to 0 artifacts
             }
             # Update the discovered column for the current seed
             discovered_column = f"discovered_{save_id}"
@@ -526,31 +527,36 @@ LOCATION_PROPERTIES = {
         "num_rooms": 5,
         "max_room_size": 6,
         "min_room_size": 3,
-        "enemies": []  # No enemies
+        "enemies": [],
+        "pickups": [("heal", 2), ("ammo", 2), ("artifact", 1)]  # Add pick-ups
     },
     "depot_ruins": {
         "num_rooms": 8,
         "max_room_size": 8,
         "min_room_size": 4,
-        "enemies": [("drone", 5), ("robot", 2)]  # 5 drones, 2 robots
+        "enemies": [("drone", 5), ("robot", 2)],
+        "pickups": [("heal", 3), ("ammo", 3), ("artifact", 2)]
     },
     "stockpile_ruins": {
         "num_rooms": 10,
         "max_room_size": 10,
         "min_room_size": 5,
-        "enemies": [("drone", 7), ("robot", 3)]  # 7 drones, 3 robots
+        "enemies": [("drone", 7), ("robot", 3)],
+        "pickups": [("heal", 4), ("ammo", 4), ("artifact", 3)]
     },
     "lab_ruins": {
         "num_rooms": 15,
         "max_room_size": 12,
         "min_room_size": 6,
-        "enemies": [("drone", 10), ("robot", 5), ("sentry", 3)]  # All enemy types
+        "enemies": [("drone", 10), ("robot", 5), ("sentry", 3)],
+        "pickups": [("heal", 5), ("ammo", 5), ("artifact", 4)]
     },
     "extraction_point": {
         "num_rooms": 15,
         "max_room_size": 12,
         "min_room_size": 6,
-        "enemies": [("drone", 12), ("robot", 6), ("sentry", 4)]  # More enemies
+        "enemies": [("drone", 12), ("robot", 6), ("sentry", 4)],
+        "pickups": [("artifact", 5)]  # Only artifacts
     }
 }
 

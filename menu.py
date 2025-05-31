@@ -222,6 +222,7 @@ def exploration_window(location_name, inventory, player_stats):
     railgun_bolts = player_stats["railgun_bolts"]
     shotgun_shells = player_stats["shotgun_shells"]
     current_weapon = player_stats["current_weapon"]
+    artifacts = player_stats.get("artifacts", 0)
 
     # Generate a random map
     map_width, map_height = 50, 50
@@ -240,10 +241,12 @@ def exploration_window(location_name, inventory, player_stats):
     rotation_speed = 0.05  # Rotation speed
     shield_regen_rate = 0.1  # Shield regeneration per frame
     shoot_cooldown = 0  # Cooldown timer for shooting
-    current_weapon = "gun"  # Default weapon
-    
+
     # Enemy properties
     enemies = []
+
+    # Pick-up properties
+    pickups = []  # Initialize the list to store pick-ups
 
     def spawn_enemies():
         """Spawn enemies based on the location type."""
@@ -268,10 +271,21 @@ def exploration_window(location_name, inventory, player_stats):
                         })
                         break
 
-    spawn_enemies()
-
-    running = True
-    clock = pygame.time.Clock()
+    def spawn_pickups():
+        """Spawn pick-ups based on the location type."""
+        pickup_config = LOCATION_PROPERTIES[location_name]["pickups"]
+        for pickup_type, count in pickup_config:
+            for _ in range(count):
+                while True:
+                    x = random.randint(1, map_width - 2)
+                    y = random.randint(1, map_height - 2)
+                    if game_map[y][x] == 0:  # Ensure the pick-up spawns on a floor tile
+                        pickups.append({
+                            "type": pickup_type,
+                            "x": x * tile_size + tile_size // 2,
+                            "y": y * tile_size + tile_size // 2
+                        })
+                        break
 
     def is_visible(x, y):
         """Check if a point (x, y) is visible to the player using raycasting."""
@@ -334,34 +348,57 @@ def exploration_window(location_name, inventory, player_stats):
                 color = (255, 0, 0) if enemy["type"] == "drone" else (255, 165, 0) if enemy["type"] == "robot" else (0, 0, 255)
                 pygame.draw.rect(exploration_screen, color, (enemy_screen_x - 5, (screen_height // 2) - (enemy_height // 2), 10, enemy_height))
 
+    def render_pickups():
+        """Render pick-ups in the 3D view."""
+        for pickup in pickups:
+            dx = pickup["x"] - player_x
+            dy = pickup["y"] - player_y
+            distance = math.sqrt(dx ** 2 + dy ** 2)
+
+            if is_visible(pickup["x"], pickup["y"]):
+                # Render pick-up as a small colored rectangle
+                angle_to_pickup = math.atan2(dy, dx)
+                angle_diff = (angle_to_pickup - player_angle + math.pi) % (2 * math.pi) - math.pi
+                pickup_height = int(screen_height / (distance * 0.01))
+                pickup_screen_x = int((angle_diff + fov / 2) / fov * screen_width)
+                color = (0, 255, 0) if pickup["type"] == "heal" else (255, 255, 0) if pickup["type"] == "ammo" else (128, 0, 128)
+                pygame.draw.rect(exploration_screen, color, (pickup_screen_x - 5, (screen_height // 2) - (pickup_height // 2), 10, pickup_height))
+
     def render_minimap():
-                """Render a top-down minimap in the top-right corner."""
-                minimap_scale = 4  # Scale factor for the minimap
-                minimap_width = map_width * minimap_scale
-                minimap_height = map_height * minimap_scale
-                minimap_surface = pygame.Surface((minimap_width, minimap_height))
-                minimap_surface.fill((50, 50, 50))  # Background color for the minimap
+        """Render a top-down minimap in the top-right corner."""
+        minimap_scale = 4  # Scale factor for the minimap
+        minimap_width = map_width * minimap_scale
+        minimap_height = map_height * minimap_scale
+        minimap_surface = pygame.Surface((minimap_width, minimap_height))
+        minimap_surface.fill((50, 50, 50))  # Background color for the minimap
 
-                # Draw the map
-                for y in range(map_height):
-                    for x in range(map_width):
-                        color = (200, 200, 200) if game_map[y][x] == 1 else (0, 0, 0)
-                        pygame.draw.rect(minimap_surface, color, (x * minimap_scale, y * minimap_scale, minimap_scale, minimap_scale))
+        # Draw the map
+        for y in range(map_height):
+            for x in range(map_width):
+                color = (200, 200, 200) if game_map[y][x] == 1 else (0, 0, 0)
+                pygame.draw.rect(minimap_surface, color, (x * minimap_scale, y * minimap_scale, minimap_scale, minimap_scale))
 
-                # Draw the player on the minimap
-                player_minimap_x = int(player_x / tile_size * minimap_scale)
-                player_minimap_y = int(player_y / tile_size * minimap_scale)
-                pygame.draw.circle(minimap_surface, (0, 255, 0), (player_minimap_x, player_minimap_y), 3)
+        # Draw the player on the minimap
+        player_minimap_x = int(player_x / tile_size * minimap_scale)
+        player_minimap_y = int(player_y / tile_size * minimap_scale)
+        pygame.draw.circle(minimap_surface, (0, 255, 0), (player_minimap_x, player_minimap_y), 3)
 
-                # Draw enemies on the minimap
-                for enemy in enemies:
-                    enemy_minimap_x = int(enemy["x"] / tile_size * minimap_scale)
-                    enemy_minimap_y = int(enemy["y"] / tile_size * minimap_scale)
-                    color = (255, 0, 0) if enemy["type"] == "drone" else (255, 165, 0) if enemy["type"] == "robot" else (0, 0, 255)
-                    pygame.draw.circle(minimap_surface, color, (enemy_minimap_x, enemy_minimap_y), 3)
+        # Draw enemies on the minimap
+        for enemy in enemies:
+            enemy_minimap_x = int(enemy["x"] / tile_size * minimap_scale)
+            enemy_minimap_y = int(enemy["y"] / tile_size * minimap_scale)
+            color = (255, 0, 0) if enemy["type"] == "drone" else (255, 165, 0) if enemy["type"] == "robot" else (0, 0, 255)
+            pygame.draw.circle(minimap_surface, color, (enemy_minimap_x, enemy_minimap_y), 3)
 
-                # Blit the minimap onto the main screen
-                exploration_screen.blit(minimap_surface, (screen_width - minimap_width - 10, 10))
+        # Draw pick-ups on the minimap
+        for pickup in pickups:
+            pickup_minimap_x = int(pickup["x"] / tile_size * minimap_scale)
+            pickup_minimap_y = int(pickup["y"] / tile_size * minimap_scale)
+            color = (0, 255, 0) if pickup["type"] == "heal" else (255, 255, 0) if pickup["type"] == "ammo" else (128, 0, 128)
+            pygame.draw.circle(minimap_surface, color, (pickup_minimap_x, pickup_minimap_y), 3)
+
+        # Blit the minimap onto the main screen
+        exploration_screen.blit(minimap_surface, (screen_width - minimap_width - 10, 10))
 
     def update_enemies():
         """Update enemy positions and behavior."""
@@ -405,7 +442,32 @@ def exploration_window(location_name, inventory, player_stats):
         for enemy in enemies:
             if enemy["attack_cooldown"] > 0:
                 enemy["attack_cooldown"] -= 1
+    def collect_pickups():
+        """Check if the player collects any pick-ups."""
+        nonlocal player_hp, player_ammo, artifacts
+        pickups_to_remove = []  # Initialize the list to track collected pick-ups
+        for pickup in pickups:
+            dx = pickup["x"] - player_x
+            dy = pickup["y"] - player_y
+            distance = math.sqrt(dx ** 2 + dy ** 2)
 
+            if distance < tile_size:  # Player is close enough to collect the pick-up
+                if pickup["type"] == "heal":
+                    player_hp = min(player_hp + 25, 100)  # Heal the player (max HP is 100)
+                    print("Collected a heal! HP restored.")
+                elif pickup["type"] == "ammo":
+                    player_ammo +=10
+                    railgun_bolts +=1
+                    shotgun_shells +=4
+                    print("Collected ammo! Ammo increased.")
+                elif pickup["type"] == "artifact":
+                    artifacts += 1  # Increment artifacts
+                    print("Collected an artifact!")
+                pickups_to_remove.append(pickup)
+
+        # Remove collected pick-ups
+        for pickup in pickups_to_remove:
+            pickups.remove(pickup)
     def shoot():
         """Handle player shooting."""
         nonlocal player_ammo, railgun_bolts, shotgun_shells, player_shield
@@ -447,7 +509,7 @@ def exploration_window(location_name, inventory, player_stats):
             return
 
         # Apply damage to enemies in line of sight
-        enemies_to_remove = []  # Track enemies to remove after the loop
+        enemies_to_remove = []  # Use a list to track enemies to remove
 
         if current_weapon == "shotgun":
             # Multishot logic for shotgun
@@ -463,8 +525,8 @@ def exploration_window(location_name, inventory, player_stats):
                     # Check if the enemy is in the pellet's line of sight and within range
                     if abs(angle_diff) < math.radians(5) and distance <= range_limit and is_visible(enemy["x"], enemy["y"]):
                         enemy["hp"] -= damage
-                        if enemy["hp"] <= 0:
-                            enemies_to_remove.append(enemy)
+                        if enemy["hp"] <= 0 and enemy not in enemies_to_remove:
+                            enemies_to_remove.append(enemy)  # Add to list if not already present
                             print(f"Enemy {enemy['type']} defeated by shotgun pellet!")
         else:
             # Single-shot logic for other weapons
@@ -476,11 +538,11 @@ def exploration_window(location_name, inventory, player_stats):
                 # Check if the enemy is in the player's line of sight and within range
                 if distance <= range_limit and is_visible(enemy["x"], enemy["y"]):
                     enemy["hp"] -= damage
-                    if enemy["hp"] <= 0:
-                        enemies_to_remove.append(enemy)
+                    if enemy["hp"] <= 0 and enemy not in enemies_to_remove:
+                        enemies_to_remove.append(enemy)  # Add to list if not already present
                         print(f"Enemy {enemy['type']} defeated!")
 
-        # Remove defeated enemies after the loop to avoid modifying the list while iterating
+        # Remove defeated enemies after the loop
         for enemy in enemies_to_remove:
             enemies.remove(enemy)
 
@@ -491,6 +553,13 @@ def exploration_window(location_name, inventory, player_stats):
         """Regenerate the player's shield."""
         nonlocal player_shield
         player_shield = min(player_shield + shield_regen_rate, 50)
+
+    # Spawn enemies and pick-ups
+    spawn_enemies()
+    spawn_pickups()
+
+    running = True
+    clock = pygame.time.Clock()
 
     while running:
         exploration_screen.fill((0, 0, 0))  # Clear the screen
@@ -544,8 +613,14 @@ def exploration_window(location_name, inventory, player_stats):
         # Update enemies
         update_enemies()
 
+        # Collect pick-ups
+        collect_pickups()
+
         # Cast rays and render the environment
         cast_rays()
+
+        # Render pick-ups
+        render_pickups()
 
         # Render the minimap
         render_minimap()
@@ -576,6 +651,7 @@ def exploration_window(location_name, inventory, player_stats):
     player_stats["railgun_bolts"] = railgun_bolts
     player_stats["shotgun_shells"] = shotgun_shells
     player_stats["current_weapon"] = current_weapon
+    player_stats["artifacts"] = artifacts
 
     # Restore the main game display
     pygame.display.set_mode((800, 600))
