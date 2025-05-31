@@ -36,7 +36,9 @@ def main_loop(load_saved=False, save_name=None):
                     "ammo": 10,
                     "railgun_bolts": 5,
                     "shotgun_shells": 8,
-                    "current_weapon": "gun"
+                    "current_weapon": "gun",
+                    "artifacts": 0,  # Initialize artifacts to 0
+                    "player_level": 0  # Initialize player level to 0
                 }
             else:
                 world, seed = create_world(seed)
@@ -53,7 +55,9 @@ def main_loop(load_saved=False, save_name=None):
                 "ammo": 10,
                 "railgun_bolts": 5,
                 "shotgun_shells": 8,
-                "current_weapon": "gun"
+                "current_weapon": "gun",
+                "artifacts": 0,  # Initialize artifacts to 0
+                "player_level": 0  # Initialize player level to 0
             }
     else:
         world, seed = create_world()
@@ -68,7 +72,9 @@ def main_loop(load_saved=False, save_name=None):
             "ammo": 10,
             "railgun_bolts": 5,
             "shotgun_shells": 8,
-            "current_weapon": "gun"
+            "current_weapon": "gun",
+            "artifacts": 0,  # Initialize artifacts to 0
+            "player_level": 0  # Initialize player level to 0
         }
 
     actor = pygame.image.load("assets/actor.png")
@@ -154,7 +160,7 @@ def main_loop(load_saved=False, save_name=None):
 
         #не знаю навіщо але я добавив оптимізацію... 
         if needs_update or actor_pos != target:  #коли ми рухаємося то оновлення екрану триває
-            target = move_actor(actor_pos, target, world)
+            target = move_actor(actor_pos, target, world, player_stats)
             camera_x = actor_pos[0]
             camera_y = actor_pos[1]
 
@@ -189,6 +195,14 @@ def main_loop(load_saved=False, save_name=None):
             if extraction_coords:
                 extraction_coords_text = font.render(f"Extraction: ({extraction_coords['x']}, {extraction_coords['y']})", True, (255, 255, 255))
                 screen.blit(extraction_coords_text, (10, 110))
+
+            # Inside the main loop, render artifact count
+            artifact_text = font.render(f"Artifacts: {player_stats.get('artifacts', 0)}", True, (255, 255, 0))
+            screen.blit(artifact_text, (10, 140))
+
+            # Render HP on the world map
+            hp_text = font.render(f"HP: {player_stats['hp']}", True, (255, 0, 0))
+            screen.blit(hp_text, (10, 170))
 
             if target:
                 pygame.draw.circle(screen, (0, 255, 0), (target[0], target[1]), 5)

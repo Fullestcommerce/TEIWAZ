@@ -5,6 +5,14 @@ import pygame
 import math
 from logic import *
 
+# Define weapon level requirements
+WEAPON_LEVEL_REQUIREMENTS = {
+    "gun": 0,          # Gun is available at level 0
+    "railgun": 2,      # Railgun unlocks at level 2
+    "shotgun": 3,      # Shotgun unlocks at level 3
+    "power_fist": 5    # Power Fist unlocks at level 5
+}
+
 #Нагадую, все працює на костилях і через зад, не лізь лишній раз в код меню
 def draw_text(screen, text, pos, font, color):
     text_surface = font.render(text, True, color)
@@ -237,10 +245,16 @@ def exploration_window(location_name, inventory, player_stats):
     # Player properties
     player_x, player_y = rooms[0][0] * tile_size + tile_size // 2, rooms[0][1] * tile_size + tile_size // 2  # Start in the first room
     player_angle = 0  # Player's viewing angle
-    player_speed = 3  # Movement speed
+    player_speed = 3  # Default movement speed
     rotation_speed = 0.05  # Rotation speed
-    shield_regen_rate = 0.1  # Shield regeneration per frame
-    shoot_cooldown = 0  # Cooldown timer for shooting
+
+    def update_player_speed():
+        """Update the player's movement speed based on their level."""
+        nonlocal player_speed
+        if player_stats["player_level"] >= 6:
+            player_speed = 6  # Increase speed at level 6
+        else:
+            player_speed = 3  # Default speed
 
     # Enemy properties
     enemies = []
@@ -444,7 +458,7 @@ def exploration_window(location_name, inventory, player_stats):
                 enemy["attack_cooldown"] -= 1
     def collect_pickups():
         """Check if the player collects any pick-ups."""
-        nonlocal player_hp, player_ammo, artifacts
+        nonlocal player_hp, player_ammo, railgun_bolts, shotgun_shells, artifacts
         pickups_to_remove = []  # Initialize the list to track collected pick-ups
         for pickup in pickups:
             dx = pickup["x"] - player_x
@@ -456,12 +470,14 @@ def exploration_window(location_name, inventory, player_stats):
                     player_hp = min(player_hp + 25, 100)  # Heal the player (max HP is 100)
                     print("Collected a heal! HP restored.")
                 elif pickup["type"] == "ammo":
-                    player_ammo +=10
-                    railgun_bolts +=1
-                    shotgun_shells +=4
+                    player_ammo += 10
+                    railgun_bolts += 1
+                    shotgun_shells += 4
                     print("Collected ammo! Ammo increased.")
                 elif pickup["type"] == "artifact":
                     artifacts += 1  # Increment artifacts
+                    player_stats["artifacts"] = artifacts
+                    update_player_level(player_stats)  # Update player level
                     print("Collected an artifact!")
                 pickups_to_remove.append(pickup)
 
@@ -552,12 +568,24 @@ def exploration_window(location_name, inventory, player_stats):
     def update_shield():
         """Regenerate the player's shield."""
         nonlocal player_shield
-        player_shield = min(player_shield + shield_regen_rate, 50)
+        max_shield = 0 if player_stats["player_level"] == 1 else 50 if player_stats["player_level"] < 4 else 100  # Max shield increases at level 4
+        shield_regen_rate = 0.1 if player_stats["player_level"] < 4 else 0.2  # Faster regen after level 4
+        player_shield = min(player_shield + shield_regen_rate, max_shield)
+
+    def switch_weapon(weapon_name):
+        """Switch to a weapon if the player meets the level requirement."""
+        required_level = WEAPON_LEVEL_REQUIREMENTS.get(weapon_name, 0)
+        if player_stats["player_level"] >= required_level:
+            nonlocal current_weapon
+            current_weapon = weapon_name
+            print(f"Switched to {weapon_name}.")
+        else:
+            print(f"{weapon_name.capitalize()} is locked! Requires level {required_level}.")
 
     # Spawn enemies and pick-ups
     spawn_enemies()
     spawn_pickups()
-
+    update_player_speed()
     running = True
     clock = pygame.time.Clock()
 
@@ -574,13 +602,13 @@ def exploration_window(location_name, inventory, player_stats):
                 if event.key == pygame.K_SPACE:  # Shoot
                     shoot()
                 if event.key == pygame.K_1:
-                    current_weapon = "gun"
+                    switch_weapon("gun")
                 if event.key == pygame.K_2:
-                    current_weapon = "railgun"
+                    switch_weapon("railgun")
                 if event.key == pygame.K_3:
-                    current_weapon = "shotgun"
+                    switch_weapon("shotgun")
                 if event.key == pygame.K_4:
-                    current_weapon = "power_fist"
+                    switch_weapon("power_fist")
 
         # Handle movement with collision detection
         keys = pygame.key.get_pressed()
@@ -640,6 +668,10 @@ def exploration_window(location_name, inventory, player_stats):
         exploration_screen.blit(shotgun_text, (10, 130))
         exploration_screen.blit(weapon_text, (10, 160))
 
+        # Inside the exploration loop, render artifact count
+        artifact_text = font.render(f"Artifacts: {artifacts}", True, (255, 255, 0))
+        exploration_screen.blit(artifact_text, (10, 190))
+
         # Update the display
         pygame.display.flip()
         clock.tick(60)  # Limit to 60 FPS
@@ -658,3 +690,9 @@ def exploration_window(location_name, inventory, player_stats):
     pygame.display.set_caption("TEIWAZ v_0.1")
 
     return inventory, player_stats
+
+def render_locked_weapon_message(message):
+    """Display a message on the screen for locked weapons."""
+    font = pygame.font.Font(None, 36)
+    text = font.render(message, True, (255, 0, 0))
+    exploration_screen.blit(text, (10, 220))  # Display below the HUD

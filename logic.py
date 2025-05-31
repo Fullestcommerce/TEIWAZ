@@ -173,23 +173,22 @@ def render_world(screen, world_map, camera_x, camera_y, objects):
         obj_image = pygame.image.load(f"assets/{obj['type']}.png")  
         screen.blit(obj_image, (obj["x"] - camera_x, obj["y"] - camera_y)) 
 
-def move_actor(actor_pos, target, world_map):
+def move_actor(actor_pos, target, world_map, player_stats):
     if target:
-        dx = target[0]-400
-        dy = target[1]-300
+        dx = target[0] - 400
+        dy = target[1] - 300
         print(dx, dy)
         distance = (dx**2 + dy**2) ** 0.5
         if distance < 5:
             target = None
         else:
-            x, y = (actor_pos[0]+400)/TILE_SIZE, (actor_pos[1]+300)/TILE_SIZE
+            x, y = (actor_pos[0] + 400) / TILE_SIZE, (actor_pos[1] + 300) / TILE_SIZE
             print(f"X: {x}, Y: {y}")
-            speed=min(5/world_map[int(x)][int(y)],5)
-            #speed=30
+            speed = min(player_stats.get("world_map_speed", 2.5) / world_map[int(x)][int(y)], 5)
             actor_pos[0] += dx / distance * speed
             actor_pos[1] += dy / distance * speed
-            target=list(target)
-            target[0] -= dx/distance * speed
+            target = list(target)
+            target[0] -= dx / distance * speed
             target[1] -= dy / distance * speed
             print(f"Actor pos: {actor_pos}, Speed: {speed}, Distance: {distance}")
     return target
@@ -204,7 +203,8 @@ def save_game_to_db(save_id, seed, actor_pos, game_timer, inventory, objects, pl
         cursor = connection.cursor()
 
         inventory_str = ",".join(inventory)
-        player_stats_str = json.dumps(player_stats)  # Save player stats as JSON
+        # Save player stats as JSON
+        player_stats_str = json.dumps(player_stats)
         # Save the game state
         query = """
             INSERT INTO saves (id, save_name, seed, actor_pos_x, actor_pos_y, game_timer, inventory, progress)
@@ -265,7 +265,8 @@ def load_game_from_db(save_id):
                 "railgun_bolts": 5,
                 "shotgun_shells": 8,
                 "current_weapon": "gun",
-                "artifacts": 0  # Default to 0 artifacts
+                "artifacts": 0,  # Default to 0 artifacts
+                "player_level": 0  # Default to level 0
             }
             # Update the discovered column for the current seed
             discovered_column = f"discovered_{save_id}"
@@ -528,7 +529,7 @@ LOCATION_PROPERTIES = {
         "max_room_size": 6,
         "min_room_size": 3,
         "enemies": [],
-        "pickups": [("heal", 2), ("ammo", 2), ("artifact", 1)]  # Add pick-ups
+        "pickups": [("heal", 2), ("ammo", 2), ("artifact", 15)]  # Add pick-ups
     },
     "depot_ruins": {
         "num_rooms": 8,
@@ -599,4 +600,56 @@ def a_star_search(game_map, start, goal):
                     heapq.heappush(open_set, (f_score[neighbor], neighbor))
 
     return []  # No path found
+
+def update_player_level(player_stats):
+    """Update the player's level based on the number of artifacts."""
+    artifacts = player_stats["artifacts"]
+    level = 0
+
+    if artifacts >= 1:
+        level = 1  # Unlock shield
+    if artifacts >= 3:
+        level = 2  # Unlock railgun and increase world map speed
+    if artifacts >= 5:
+        level = 3  # Unlock shotgun
+    if artifacts >= 7:
+        level = 4  # Upgrade shield to 100
+    if artifacts >= 10:
+        level = 5  # Unlock power fist
+    if artifacts >= 15:
+        level = 6  # Increase speed and world map speed
+
+    if level > player_stats.get("player_level", 0):
+        print(f"Level up! You are now level {level}.")
+        player_stats["player_level"] = level
+        apply_level_upgrades(player_stats)
+        update_world_map_speed(player_stats)  # Update world map speed
+
+def apply_level_upgrades(player_stats):
+    """Apply upgrades based on the player's level."""
+    level = player_stats["player_level"]
+
+    if level == 1:
+        player_stats["shield"] = 50  # Unlock shield
+    elif level == 2:
+        player_stats["railgun_bolts"] = 5  # Unlock railgun
+        player_stats["world_map_speed"] = 3.5  # Increase world map speed
+    elif level == 3:
+        player_stats["shotgun_shells"] = 8  # Unlock shotgun
+    elif level == 4:
+        player_stats["shield"] = 100  # Upgrade shield to 100
+    elif level == 5:
+        player_stats["current_weapon"] = "power_fist"  # Unlock power fist
+    elif level == 6:
+        player_stats["speed"] = 4  # Increase player speed
+        player_stats["world_map_speed"] = 4.5  # Increase world map speed
+
+def update_world_map_speed(player_stats):
+    """Update the player's world map speed based on their level."""
+    if player_stats["player_level"] >= 6:
+        player_stats["world_map_speed"] = 4.5  # Max speed at level 6
+    elif player_stats["player_level"] >= 2:
+        player_stats["world_map_speed"] = 3.5  # Increased speed at level 2
+    else:
+        player_stats["world_map_speed"] = 2.5  # Default speed
 
