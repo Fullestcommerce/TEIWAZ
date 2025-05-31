@@ -13,6 +13,7 @@ pygame.display.set_caption("TEIWAZ v_0.1")
 clock = pygame.time.Clock()
 FPS = 24
 
+end = False
 #чек БД
 setup_database()
 
@@ -37,8 +38,8 @@ def main_loop(load_saved=False, save_name=None):
                     "railgun_bolts": 5,
                     "shotgun_shells": 8,
                     "current_weapon": "gun",
-                    "artifacts": 0,  # Initialize artifacts to 0
-                    "player_level": 0  # Initialize player level to 0
+                    "artifacts": 0,  
+                    "player_level": 0  
                 }
             else:
                 world, seed = create_world(seed)
@@ -56,8 +57,8 @@ def main_loop(load_saved=False, save_name=None):
                 "railgun_bolts": 5,
                 "shotgun_shells": 8,
                 "current_weapon": "gun",
-                "artifacts": 0,  # Initialize artifacts to 0
-                "player_level": 0  # Initialize player level to 0
+                "artifacts": 0,  
+                "player_level": 0
             }
     else:
         world, seed = create_world()
@@ -105,8 +106,7 @@ def main_loop(load_saved=False, save_name=None):
 
     while running:
         #бере реальний час а не відштовхується від кадрів що до біса круто
-        game_timer += clock.get_time() / 1000 
-
+        game_timer += clock.get_time() / 1000  
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -124,7 +124,7 @@ def main_loop(load_saved=False, save_name=None):
                 if event.key == pygame.K_e:  #взаємодія з об'єктами
                     closest_obj = None#пуста змінна для сканера
                     min_distance = float('inf')
-
+              
                     #сканер(працює основуючись на бд)
                     for obj in objects:
                         distance_to_obj = ((actor_pos[0] + 400 - obj["x"]) ** 2 + (actor_pos[1] + 300 - obj["y"]) ** 2) ** 0.5
@@ -135,11 +135,22 @@ def main_loop(load_saved=False, save_name=None):
                         if closest_obj["discovered"]:
                             print(f"You have already explored the {closest_obj['type']} at ({closest_obj['x']}, {closest_obj['y']}).")
                         else:
-                            if closest_obj["type"] != "extraction_point":
+                            if closest_obj["type"] == "extraction_point":
+                                print(f"Entering location: {closest_obj['type']}")
+                                print(f"Player stats before entering: {player_stats}")
+                                print(f"Inventory before entering: {inventory}")
+                                inventory, player_stats = exploration_window(closest_obj["type"], inventory, player_stats)
+                                print(f"Player stats after exiting: {player_stats}")
+                                print(f"Inventory after exiting: {inventory}")
+                                
+                                closest_obj["discovered"] = True
+                                mark_object_as_discovered(closest_obj["id"])
+                                end=True#гру завершено UwU
+                            else:
                                 interaction_result = f"You looted a {closest_obj['type']}!"
                                 inventory.append(closest_obj["type"])
-                                closest_obj["discovered"] = True  # Позначаємо об'єкт як досліджений
-                                mark_object_as_discovered(closest_obj["id"])  # Оновлюємо стан у базі даних
+                                closest_obj["discovered"] = True
+                                mark_object_as_discovered(closest_obj["id"])  
                                 print(interaction_result)
                                 print(f"Entering location: {closest_obj['type']}")
                                 print(f"Player stats before entering: {player_stats}")
@@ -147,10 +158,6 @@ def main_loop(load_saved=False, save_name=None):
                                 inventory, player_stats = exploration_window(closest_obj["type"], inventory, player_stats)
                                 print(f"Player stats after exiting: {player_stats}")
                                 print(f"Inventory after exiting: {inventory}")
-                            else:
-                                print("You reached the extraction point!")
-                                # Кінець гри
-                                end_game(inventory, game_timer)
                             target = None
                     else:
                         print("No objects nearby to interact with.")
@@ -196,11 +203,11 @@ def main_loop(load_saved=False, save_name=None):
                 extraction_coords_text = font.render(f"Extraction: ({extraction_coords['x']}, {extraction_coords['y']})", True, (255, 255, 255))
                 screen.blit(extraction_coords_text, (10, 110))
 
-            # Inside the main loop, render artifact count
+            #табло АРТІФАКТІВ
             artifact_text = font.render(f"Artifacts: {player_stats.get('artifacts', 0)}", True, (255, 255, 0))
             screen.blit(artifact_text, (10, 140))
 
-            # Render HP on the world map
+            #Хліб Поінти
             hp_text = font.render(f"HP: {player_stats['hp']}", True, (255, 0, 0))
             screen.blit(hp_text, (10, 170))
 
@@ -214,12 +221,17 @@ def main_loop(load_saved=False, save_name=None):
             clock.tick(FPS) #але я її не чіпаю, бо в майбутньому планую замінити нинішню систему на неї
         else:
             clock.tick(1)  #але ж цікавий концепт? чи не так?
-
+        if end==True:
+            end_game(inventory, game_timer)
     pygame.quit()
     sys.exit()
 
 def end_game(inventory, game_timer):
-    score = len(inventory) * 100  #100 гривень за кожен предмет
+    locations_cleared = len([item for item in inventory if item != "artifact"])
+    artifacts_collected = len([item for item in inventory if item == "artifact"])
+    time_bonus = max(0, 1000 - int(game_timer))  # Спід бонус
+
+    score = locations_cleared * 200 + artifacts_collected * 300 + time_bonus
     print(f"Game Over! Your score: {score}")
     print(f"Time: {int(game_timer)} seconds")
     print(f"Inventory: {', '.join(inventory) if inventory else 'Empty'}")

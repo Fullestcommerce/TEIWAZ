@@ -3,7 +3,7 @@ import random
 from noise import pnoise2
 import json
 import mysql.connector
-import heapq  # For priority queue
+import heapq  #потрібно для A* алгоритму
 #Тут зараз буде 400 рядків чистого хаосу і години моєї праці
 TILE_SIZE=32
 MAP_WIDTH=300 
@@ -203,9 +203,9 @@ def save_game_to_db(save_id, seed, actor_pos, game_timer, inventory, objects, pl
         cursor = connection.cursor()
 
         inventory_str = ",".join(inventory)
-        # Save player stats as JSON
+        #стати гравця рядком
         player_stats_str = json.dumps(player_stats)
-        # Save the game state
+        # зберігає стан гри
         query = """
             INSERT INTO saves (id, save_name, seed, actor_pos_x, actor_pos_y, game_timer, inventory, progress)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
@@ -221,7 +221,7 @@ def save_game_to_db(save_id, seed, actor_pos, game_timer, inventory, objects, pl
         save_name = f"Slot {save_id}"
         cursor.execute(query, (save_id, save_name, seed, actor_pos[0], actor_pos[1], game_timer, inventory_str, player_stats_str))
 
-        # Update the discovered_<slot> column for the current seed
+        # апдейт досліджених об'єктів
         discovered_column = f"discovered_{save_id}"
         query = f"""
             UPDATE objects
@@ -246,7 +246,7 @@ def load_game_from_db(save_id):
     try:
         cursor = connection.cursor()
 
-        # Load the game state
+        # загрузка стану гри
         query = """
             SELECT seed, actor_pos_x, actor_pos_y, game_timer, inventory, progress
             FROM saves
@@ -265,10 +265,10 @@ def load_game_from_db(save_id):
                 "railgun_bolts": 5,
                 "shotgun_shells": 8,
                 "current_weapon": "gun",
-                "artifacts": 0,  # Default to 0 artifacts
-                "player_level": 0  # Default to level 0
+                "artifacts": 0, 
+                "player_level": 0 
             }
-            # Update the discovered column for the current seed
+            
             discovered_column = f"discovered_{save_id}"
             query = f"""
                 UPDATE objects
@@ -278,7 +278,7 @@ def load_game_from_db(save_id):
             print(f"Executing query: {query} with seed: {seed}")
             cursor.execute(query, (seed,))
 
-            # Load objects for the seed
+            
             objects = load_objects_from_db(seed)
 
             print(f"Data loaded: seed={seed}, actor_pos={[actor_pos_x, actor_pos_y]}, game_timer={game_timer}, inventory={inventory}")
@@ -350,10 +350,10 @@ def generate_structures(seed):
     try:
         cursor = connection.cursor()
 
-        # Clear existing structures for the seed
+        
         cursor.execute("DELETE FROM objects WHERE seed = %s", (seed,))
 
-        # Define location types and their counts
+     
         location_types = [
             ("depot_ruins", random.randint(4, 6)),
             ("stockpile_ruins", random.randint(3, 5)),
@@ -367,7 +367,7 @@ def generate_structures(seed):
         def random_position():
             return random.randint(0, MAP_WIDTH * TILE_SIZE), random.randint(0, MAP_HEIGHT * TILE_SIZE)
 
-        # Generate structures based on location types
+       
         for location_type, count in location_types:
             for _ in range(count):
                 x, y = random_position()
@@ -381,7 +381,7 @@ def generate_structures(seed):
             {"type": "extraction_point", "x": TILE_SIZE * 25, "y": TILE_SIZE * 25},
         ]
         structures.extend(debug_structures)
-        # Save structures to the database
+      
         for structure in structures:
             cursor.execute("""
                 INSERT INTO objects (object_type, pos_x, pos_y, seed, discovered)
@@ -472,7 +472,7 @@ def mark_object_as_discovered(object_id):
 def generate_random_map(width, height, location_type):
     """Generate a random map with rooms and corridors based on location type."""
     if location_type not in LOCATION_PROPERTIES:
-        return [[1 for _ in range(width)] for _ in range(height)], []  # Default to walls
+        return [[1 for _ in range(width)] for _ in range(height)], []  #СТІНИ
 
     props = LOCATION_PROPERTIES[location_type]
     num_rooms = props["num_rooms"]
@@ -492,19 +492,19 @@ def generate_random_map(width, height, location_type):
     def create_corridor(x1, y1, x2, y2):
         """Carve out a corridor between two points."""
         if random.choice([True, False]):
-            # Horizontal first, then vertical
+            #рандомно вибираємо напрямок коридору
             for x in range(min(x1, x2), max(x1, x2) + 1):
                 game_map[y1][x] = 0
             for y in range(min(y1, y2), max(y1, y2) + 1):
                 game_map[y][x2] = 0
         else:
-            # Vertical first, then horizontal
+            #інший напрямок коридору
             for y in range(min(y1, y2), max(y1, y2) + 1):
                 game_map[y][x1] = 0
             for x in range(min(x1, x2), max(x1, x2) + 1):
                 game_map[y2][x] = 0
 
-    # Generate random rooms
+    #кімнати
     for _ in range(num_rooms):
         room_width = random.randint(min_room_size, max_room_size)
         room_height = random.randint(min_room_size, max_room_size)
@@ -515,7 +515,7 @@ def generate_random_map(width, height, location_type):
         rooms.append(new_room)
         create_room(room_x, room_y, room_width, room_height)
 
-    # Connect rooms with corridors
+    #калідори
     for i in range(1, len(rooms)):
         x1, y1 = rooms[i - 1][0] + rooms[i - 1][2] // 2, rooms[i - 1][1] + rooms[i - 1][3] // 2
         x2, y2 = rooms[i][0] + rooms[i][2] // 2, rooms[i][1] + rooms[i][3] // 2
@@ -529,7 +529,7 @@ LOCATION_PROPERTIES = {
         "max_room_size": 6,
         "min_room_size": 3,
         "enemies": [],
-        "pickups": [("heal", 2), ("ammo", 2), ("artifact", 15)]  # Add pick-ups
+        "pickups": [("heal", 2), ("ammo", 2), ("artifact", 15)]  #пік-ап крихітко
     },
     "depot_ruins": {
         "num_rooms": 8,
@@ -557,7 +557,7 @@ LOCATION_PROPERTIES = {
         "max_room_size": 12,
         "min_room_size": 6,
         "enemies": [("drone", 12), ("robot", 6), ("sentry", 4)],
-        "pickups": [("artifact", 5)]  # Only artifacts
+        "pickups": [("artifact", 5)]  #артіфакти
     }
 }
 
@@ -567,7 +567,7 @@ def heuristic(a, b):
 
 def a_star_search(game_map, start, goal):
     """A* pathfinding algorithm."""
-    neighbors = [(0, 1), (1, 0), (0, -1), (-1, 0)]  # Up, Right, Down, Left
+    neighbors = [(0, 1), (1, 0), (0, -1), (-1, 0)]  #вверх, вправо, вниз, вліво
     open_set = []
     heapq.heappush(open_set, (0, start))
     came_from = {}
@@ -578,7 +578,7 @@ def a_star_search(game_map, start, goal):
         _, current = heapq.heappop(open_set)
 
         if current == goal:
-            # Reconstruct path
+            #реконструкція калідорів
             path = []
             while current in came_from:
                 path.append(current)
@@ -589,7 +589,7 @@ def a_star_search(game_map, start, goal):
         for dx, dy in neighbors:
             neighbor = (current[0] + dx, current[1] + dy)
             if 0 <= neighbor[0] < len(game_map[0]) and 0 <= neighbor[1] < len(game_map):
-                if game_map[neighbor[1]][neighbor[0]] == 1:  # Wall
+                if game_map[neighbor[1]][neighbor[0]] == 1:  #стіни
                     continue
 
                 tentative_g_score = g_score[current] + 1
@@ -599,7 +599,7 @@ def a_star_search(game_map, start, goal):
                     f_score[neighbor] = tentative_g_score + heuristic(neighbor, goal)
                     heapq.heappush(open_set, (f_score[neighbor], neighbor))
 
-    return []  # No path found
+    return []  #не знайшли дорогу по калідорах
 
 def update_player_level(player_stats):
     """Update the player's level based on the number of artifacts."""
@@ -607,49 +607,49 @@ def update_player_level(player_stats):
     level = 0
 
     if artifacts >= 1:
-        level = 1  # Unlock shield
+        level = 1  
     if artifacts >= 3:
-        level = 2  # Unlock railgun and increase world map speed
+        level = 2  
     if artifacts >= 5:
-        level = 3  # Unlock shotgun
+        level = 3  
     if artifacts >= 7:
-        level = 4  # Upgrade shield to 100
+        level = 4  
     if artifacts >= 10:
-        level = 5  # Unlock power fist
+        level = 5  
     if artifacts >= 15:
-        level = 6  # Increase speed and world map speed
+        level = 6  
 
     if level > player_stats.get("player_level", 0):
         print(f"Level up! You are now level {level}.")
         player_stats["player_level"] = level
         apply_level_upgrades(player_stats)
-        update_world_map_speed(player_stats)  # Update world map speed
+        update_world_map_speed(player_stats) 
 
 def apply_level_upgrades(player_stats):
     """Apply upgrades based on the player's level."""
     level = player_stats["player_level"]
 
     if level == 1:
-        player_stats["shield"] = 50  # Unlock shield
+        player_stats["shield"] = 50  
     elif level == 2:
-        player_stats["railgun_bolts"] = 5  # Unlock railgun
-        player_stats["world_map_speed"] = 3.5  # Increase world map speed
+        player_stats["railgun_bolts"] = 5 
+        player_stats["world_map_speed"] = 3.5  #розблоковує рейлган
     elif level == 3:
-        player_stats["shotgun_shells"] = 8  # Unlock shotgun
+        player_stats["shotgun_shells"] = 8   #розблоковує Дум
     elif level == 4:
-        player_stats["shield"] = 100  # Upgrade shield to 100
+        player_stats["shield"] = 100  
     elif level == 5:
-        player_stats["current_weapon"] = "power_fist"  # Unlock power fist
+        player_stats["current_weapon"] = "power_fist"  #розблоковує фістинг
     elif level == 6:
-        player_stats["speed"] = 4  # Increase player speed
-        player_stats["world_map_speed"] = 4.5  # Increase world map speed
+        player_stats["speed"] = 4  
+        player_stats["world_map_speed"] = 4.5  #спід?
 
 def update_world_map_speed(player_stats):
     """Update the player's world map speed based on their level."""
     if player_stats["player_level"] >= 6:
-        player_stats["world_map_speed"] = 4.5  # Max speed at level 6
+        player_stats["world_map_speed"] = 4.5  
     elif player_stats["player_level"] >= 2:
-        player_stats["world_map_speed"] = 3.5  # Increased speed at level 2
+        player_stats["world_map_speed"] = 3.5
     else:
-        player_stats["world_map_speed"] = 2.5  # Default speed
+        player_stats["world_map_speed"] = 2.5 
 
