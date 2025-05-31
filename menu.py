@@ -277,11 +277,12 @@ def exploration_window(location_name, inventory, player_stats):
                             "y": y * tile_size + tile_size // 2,
                             "hp": 50 if enemy_type == "drone" else 100 if enemy_type == "robot" else 150,
                             "speed": 4 if enemy_type == "drone" else 2 if enemy_type == "robot" else 1,
-                            "attack_range": 3 if enemy_type == "drone" else 5 if enemy_type == "robot" else 3,  # Increased drone attack range
+                            "attack_range": 3 if enemy_type == "drone" else 5 if enemy_type == "robot" else 3,
                             "damage": 10 if enemy_type == "drone" else 20 if enemy_type == "robot" else 30,
                             "aggro_range": 10 * tile_size,  # Distance at which the enemy starts chasing the player
                             "min_distance": 2 * tile_size,  # Minimum distance to maintain from the player
                             "attack_cooldown": 0,  # Cooldown timer for enemy attacks
+                            "sprite": pygame.image.load(f"assets/{enemy_type}.png")  # Load enemy sprite
                         })
                         break
 
@@ -301,7 +302,7 @@ def exploration_window(location_name, inventory, player_stats):
                         })
                         break
 
-    def is_visible(x, y):
+    def is_visible(x, y, player_x, player_y, player_angle, fov, game_map, tile_size, max_depth):
         """Check if a point (x, y) is visible to the player using raycasting."""
         dx = x - player_x
         dy = y - player_y
@@ -353,7 +354,7 @@ def exploration_window(location_name, inventory, player_stats):
             distance = math.sqrt(dx ** 2 + dy ** 2)
 
             # Check if the enemy is visible
-            if is_visible(enemy["x"], enemy["y"]):
+            if is_visible(enemy["x"], enemy["y"], player_x, player_y, player_angle, fov, game_map, tile_size, max_depth):
                 # Calculate enemy height and position
                 angle_to_enemy = math.atan2(dy, dx)
                 angle_diff = (angle_to_enemy - player_angle + math.pi) % (2 * math.pi) - math.pi
@@ -369,7 +370,7 @@ def exploration_window(location_name, inventory, player_stats):
             dy = pickup["y"] - player_y
             distance = math.sqrt(dx ** 2 + dy ** 2)
 
-            if is_visible(pickup["x"], pickup["y"]):
+            if is_visible(pickup["x"], pickup["y"], player_x, player_y, player_angle, fov, game_map, tile_size, max_depth):
                 # Render pick-up as a small colored rectangle
                 angle_to_pickup = math.atan2(dy, dx)
                 angle_diff = (angle_to_pickup - player_angle + math.pi) % (2 * math.pi) - math.pi
@@ -539,7 +540,7 @@ def exploration_window(location_name, inventory, player_stats):
                     angle_diff = (angle_to_enemy - pellet_angle + math.pi) % (2 * math.pi) - math.pi
 
                     # Check if the enemy is in the pellet's line of sight and within range
-                    if abs(angle_diff) < math.radians(5) and distance <= range_limit and is_visible(enemy["x"], enemy["y"]):
+                    if abs(angle_diff) < math.radians(5) and distance <= range_limit and is_visible(enemy["x"], enemy["y"], player_x, player_y, player_angle, fov, game_map, tile_size, max_depth):
                         enemy["hp"] -= damage
                         if enemy["hp"] <= 0 and enemy not in enemies_to_remove:
                             enemies_to_remove.append(enemy)  # Add to list if not already present
@@ -552,7 +553,7 @@ def exploration_window(location_name, inventory, player_stats):
                 distance = math.sqrt(dx ** 2 + dy ** 2)
 
                 # Check if the enemy is in the player's line of sight and within range
-                if distance <= range_limit and is_visible(enemy["x"], enemy["y"]):
+                if distance <= range_limit and is_visible(enemy["x"], enemy["y"], player_x, player_y, player_angle, fov, game_map, tile_size, max_depth):
                     enemy["hp"] -= damage
                     if enemy["hp"] <= 0 and enemy not in enemies_to_remove:
                         enemies_to_remove.append(enemy)  # Add to list if not already present
@@ -610,7 +611,7 @@ def exploration_window(location_name, inventory, player_stats):
                 if event.key == pygame.K_4:
                     switch_weapon("power_fist")
 
-        # Handle movement with collision detection
+# Handle movement with collision detection
         keys = pygame.key.get_pressed()
         new_x, new_y = player_x, player_y
         if keys[pygame.K_w]:  # Move forward
@@ -634,6 +635,30 @@ def exploration_window(location_name, inventory, player_stats):
             player_angle -= rotation_speed
         if keys[pygame.K_d]:  # Rotate right
             player_angle += rotation_speed
+        def render_locked_weapon_message(message):
+            """Display a message on the screen for locked weapons."""
+            font = pygame.font.Font(None, 36)
+            text = font.render(message, True, (255, 0, 0))
+            exploration_screen.blit(text, (10, 220))  # Display below the HUD
+
+        def render_enemies(enemies, player_x, player_y, player_angle, fov, screen_width, screen_height, exploration_screen):
+            """Render enemies in the 3D view."""
+            for enemy in enemies:
+                dx = enemy["x"] - player_x
+                dy = enemy["y"] - player_y
+                distance = math.sqrt(dx ** 2 + dy ** 2)
+
+                # Check if the enemy is visible
+                if is_visible(enemy["x"], enemy["y"], player_x, player_y, player_angle, fov, game_map, tile_size, max_depth):
+                    # Calculate enemy height and position
+                    angle_to_enemy = math.atan2(dy, dx)
+                    angle_diff = (angle_to_enemy - player_angle + math.pi) % (2 * math.pi) - math.pi
+                    enemy_height = int(screen_height / (distance * 0.01))
+                    enemy_screen_x = int((angle_diff + fov / 2) / fov * screen_width)
+
+                    # Scale the sprite based on distance
+                    scaled_sprite = pygame.transform.scale(enemy["sprite"], (enemy_height, enemy_height))
+                    exploration_screen.blit(scaled_sprite, (enemy_screen_x - enemy_height // 2, (screen_height // 2) - (enemy_height // 2)))
 
         # Update shield
         update_shield()
@@ -646,6 +671,9 @@ def exploration_window(location_name, inventory, player_stats):
 
         # Cast rays and render the environment
         cast_rays()
+
+        # Render enemies
+        render_enemies(enemies, player_x, player_y, player_angle, fov, screen_width, screen_height, exploration_screen)
 
         # Render pick-ups
         render_pickups()
@@ -691,8 +719,3 @@ def exploration_window(location_name, inventory, player_stats):
 
     return inventory, player_stats
 
-def render_locked_weapon_message(message):
-    """Display a message on the screen for locked weapons."""
-    font = pygame.font.Font(None, 36)
-    text = font.render(message, True, (255, 0, 0))
-    exploration_screen.blit(text, (10, 220))  # Display below the HUD
