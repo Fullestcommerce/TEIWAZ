@@ -338,50 +338,38 @@ def generate_structures(seed):
     try:
         cursor = connection.cursor()
 
-        #при генерації того ж сіду треба очистити його струтури, інакше вони вже будуть досліджені і гра зламається
+        # Clear existing structures for the seed
         cursor.execute("DELETE FROM objects WHERE seed = %s", (seed,))
 
-        #перша тестова структура яка завжди генериться на одних кордах
-        structures = [
-            {"type": "crash_site", "x": 320, "y": 320}
+        # Define location types and their counts
+        location_types = [
+            ("depot_ruins", random.randint(4, 6)),
+            ("stockpile_ruins", random.randint(3, 5)),
+            ("lab_ruins", random.randint(2, 3)),
+            ("extraction_point", 1)
         ]
 
-        #Генерація інших структур
-        random.seed(seed)#використання сіду забезпечує однаковий результат генерації, що дозволяє мати менші файли збереження
-        num_ruins = random.randint(10, 16)
-        num_charging_stations = random.randint(4, 6)
-        num_fuel_depots = random.randint(4, 6)
-        num_salvaged_parts = random.randint(8, 12)
-        num_extraction_points = 1
+        structures = []
+        random.seed(seed)
 
         def random_position():
             return random.randint(0, MAP_WIDTH * TILE_SIZE), random.randint(0, MAP_HEIGHT * TILE_SIZE)
 
-        #різноманітні об'єкти. Надалі є ідея добавити геймплейні елементи, але це фаза 2
-        for _ in range(num_ruins):#добавити можливість бою з ворогами
-            x, y = random_position()#в руїнах також будуть артефакти, за які в фінальній версії і даватимуть очки
-            structures.append({"type": "ruins", "x": x, "y": y})
+        # Generate structures based on location types
+        for location_type, count in location_types:
+            for _ in range(count):
+                x, y = random_position()
+                structures.append({"type": location_type, "x": x, "y": y})
 
-        #добавити зарядку батареї ГГ
-        for _ in range(num_charging_stations):
-            x, y = random_position()
-            structures.append({"type": "charging_station", "x": x, "y": y})
-
-        #В депо необхідно буде взяти топливо для зарядки батареї і завершення гри
-        for _ in range(num_fuel_depots):
-            x, y = random_position()
-            structures.append({"type": "fuel_depot", "x": x, "y": y})
-
-        #Біля запчастин можна буде відновити хп і патрони
-        for _ in range(num_salvaged_parts):
-            x, y = random_position()
-            structures.append({"type": "salvaged_parts", "x": x, "y": y})
-
-        #лока для завершення гри
-        for _ in range(num_extraction_points):
-            x, y = random_position()
-            structures.append({"type": "extraction_point", "x": x, "y": y})
-
+        debug_structures = [
+            {"type": "small_location", "x": TILE_SIZE * 5, "y": TILE_SIZE * 5},
+            {"type": "depot_ruins", "x": TILE_SIZE * 10, "y": TILE_SIZE * 10},
+            {"type": "stockpile_ruins", "x": TILE_SIZE * 15, "y": TILE_SIZE * 15},
+            {"type": "lab_ruins", "x": TILE_SIZE * 20, "y": TILE_SIZE * 20},
+            {"type": "extraction_point", "x": TILE_SIZE * 25, "y": TILE_SIZE * 25},
+        ]
+        structures.extend(debug_structures)
+        # Save structures to the database
         for structure in structures:
             cursor.execute("""
                 INSERT INTO objects (object_type, pos_x, pos_y, seed, discovered)
@@ -469,101 +457,90 @@ def mark_object_as_discovered(object_id):
         if connection and connection.is_connected():
             cursor.close()
             connection.close()
-def render_exploration_map(screen, exploration_map, tile_size=8):
-   
-    for x, column in enumerate(exploration_map):
-        for y, tile in enumerate(column):
-            if tile == "floor":
-                color = (200, 200, 200)  # Light gray for floor
-            elif tile == "wall":
-                color = (50, 50, 50)  # Dark gray for walls
-            elif tile == "hole":
-                color = (0, 0, 0)  # Black for holes
-            else:
-                color = (255, 0, 0)  # Red for unknown tiles (debugging)
-            pygame.draw.rect(screen, color, (x * tile_size, y * tile_size, tile_size, tile_size))
+def generate_random_map(width, height, location_type):
+    """Generate a random map with rooms and corridors based on location type."""
+    if location_type not in LOCATION_PROPERTIES:
+        return [[1 for _ in range(width)] for _ in range(height)], []  # Default to walls
 
-def generate_exploration_map(seed=None, width=64, height=64):
-    if seed is None:
-        seed = random.randint(0, 100)
-    random.seed(seed)
+    props = LOCATION_PROPERTIES[location_type]
+    num_rooms = props["num_rooms"]
+    max_room_size = props["max_room_size"]
+    min_room_size = props["min_room_size"]
 
-    # Initialize the map with walls
-    exploration_map = [["wall" for _ in range(height)] for _ in range(width)]
+    game_map = [[1 for _ in range(width)] for _ in range(height)]
+    rooms = []
 
-    def carve_room(x, y, w, h):
+    def create_room(x, y, w, h):
         """Carve out a rectangular room."""
-        for i in range(x, x + w):
-            for j in range(y, y + h):
-                if 0 <= i < width and 0 <= j < height:
-                    exploration_map[i][j] = "floor"
+        for i in range(y, y + h):
+            for j in range(x, x + w):
+                if 0 <= i < height and 0 <= j < width:
+                    game_map[i][j] = 0
 
-    def carve_corridor(x1, y1, x2, y2):
+    def create_corridor(x1, y1, x2, y2):
         """Carve out a corridor between two points."""
         if random.choice([True, False]):
             # Horizontal first, then vertical
             for x in range(min(x1, x2), max(x1, x2) + 1):
-                if 0 <= x < width and 0 <= y1 < height:
-                    exploration_map[x][y1] = "floor"
+                game_map[y1][x] = 0
             for y in range(min(y1, y2), max(y1, y2) + 1):
-                if 0 <= x2 < width and 0 <= y < height:
-                    exploration_map[x2][y] = "floor"
+                game_map[y][x2] = 0
         else:
             # Vertical first, then horizontal
             for y in range(min(y1, y2), max(y1, y2) + 1):
-                if 0 <= x1 < width and 0 <= y < height:
-                    exploration_map[x1][y] = "floor"
+                game_map[y][x1] = 0
             for x in range(min(x1, x2), max(x1, x2) + 1):
-                if 0 <= x < width and 0 <= y2 < height:
-                    exploration_map[x][y2] = "floor"
+                game_map[y2][x] = 0
 
-    # Generate rooms
-    num_rooms = random.randint(8, 15)
-    rooms = []
+    # Generate random rooms
     for _ in range(num_rooms):
-        room_width = random.randint(5, 10)
-        room_height = random.randint(5, 10)
+        room_width = random.randint(min_room_size, max_room_size)
+        room_height = random.randint(min_room_size, max_room_size)
         room_x = random.randint(1, width - room_width - 1)
         room_y = random.randint(1, height - room_height - 1)
 
-        # Check for overlap with existing rooms
-        overlap = False
-        for other_room in rooms:
-            other_x, other_y, other_w, other_h = other_room
-            if (room_x < other_x + other_w and room_x + room_width > other_x and
-                    room_y < other_y + other_h and room_y + room_height > other_y):
-                overlap = True
-                break
+        new_room = (room_x, room_y, room_width, room_height)
+        rooms.append(new_room)
+        create_room(room_x, room_y, room_width, room_height)
 
-        if not overlap:
-            carve_room(room_x, room_y, room_width, room_height)
-            rooms.append((room_x, room_y, room_width, room_height))
+    # Connect rooms with corridors
+    for i in range(1, len(rooms)):
+        x1, y1 = rooms[i - 1][0] + rooms[i - 1][2] // 2, rooms[i - 1][1] + rooms[i - 1][3] // 2
+        x2, y2 = rooms[i][0] + rooms[i][2] // 2, rooms[i][1] + rooms[i][3] // 2
+        create_corridor(x1, y1, x2, y2)
 
-    # Connect rooms with corridors using a minimum spanning tree (MST)
-    room_centers = [(x + w // 2, y + h // 2) for x, y, w, h in rooms]
-    connected = set()
-    connected.add(0)
-    while len(connected) < len(room_centers):
-        min_distance = float('inf')
-        closest_pair = None
-        for i in connected:
-            for j in range(len(room_centers)):
-                if j not in connected:
-                    dist = ((room_centers[i][0] - room_centers[j][0]) ** 2 +
-                            (room_centers[i][1] - room_centers[j][1]) ** 2) ** 0.5
-                    if dist < min_distance:
-                        min_distance = dist
-                        closest_pair = (i, j)
-        if closest_pair:
-            i, j = closest_pair
-            carve_corridor(room_centers[i][0], room_centers[i][1], room_centers[j][0], room_centers[j][1])
-            connected.add(j)
+    return game_map, rooms
 
-    # Add random holes (optional)
-    num_holes = random.randint(5, 10)
-    for _ in range(num_holes):
-        hole_x = random.randint(0, width - 1)
-        hole_y = random.randint(0, height - 1)
-        exploration_map[hole_x][hole_y] = "hole"
+LOCATION_PROPERTIES = {
+    "small_location": {
+        "num_rooms": 5,
+        "max_room_size": 6,
+        "min_room_size": 3,
+        "enemies": []  # No enemies
+    },
+    "depot_ruins": {
+        "num_rooms": 8,
+        "max_room_size": 8,
+        "min_room_size": 4,
+        "enemies": [("drone", 5), ("robot", 2)]  # 5 drones, 2 robots
+    },
+    "stockpile_ruins": {
+        "num_rooms": 10,
+        "max_room_size": 10,
+        "min_room_size": 5,
+        "enemies": [("drone", 7), ("robot", 3)]  # 7 drones, 3 robots
+    },
+    "lab_ruins": {
+        "num_rooms": 15,
+        "max_room_size": 12,
+        "min_room_size": 6,
+        "enemies": [("drone", 10), ("robot", 5), ("sentry", 3)]  # All enemy types
+    },
+    "extraction_point": {
+        "num_rooms": 15,
+        "max_room_size": 12,
+        "min_room_size": 6,
+        "enemies": [("drone", 12), ("robot", 6), ("sentry", 4)]  # More enemies
+    }
+}
 
-    return exploration_map
