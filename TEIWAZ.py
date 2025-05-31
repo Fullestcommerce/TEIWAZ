@@ -77,16 +77,16 @@ def main_loop(load_saved=False, save_name=None):
     inventory = [] 
 
     def handle_pause_action(action, slot=None):
-        nonlocal seed, actor_pos, world, game_timer, inventory, objects
+        nonlocal seed, actor_pos, world, game_timer, inventory, objects, player_stats
 
         if action == "save_game":
             if slot:
-                save_game_to_db(slot, seed, actor_pos, game_timer, inventory, objects)
+                save_game_to_db(slot, seed, actor_pos, game_timer, inventory, objects, player_stats)
                 print(f"Game saved to {slot}.")
         elif action == "load_game":
             save_name = save_slot_menu(screen, clock, FPS, "Load")
             if save_name:
-                seed, actor_pos, game_timer, inventory, objects = load_game_from_db(save_name)
+                seed, actor_pos, game_timer, inventory, objects, player_stats = load_game_from_db(save_name)
                 if seed:
                     world, seed = create_world(seed)
                     print(f"Game loaded from {save_name}.")

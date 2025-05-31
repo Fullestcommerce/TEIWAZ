@@ -207,19 +207,19 @@ def save_game_to_db(save_id, seed, actor_pos, game_timer, inventory, objects, pl
         player_stats_str = json.dumps(player_stats)  # Save player stats as JSON
         # Save the game state
         query = """
-            INSERT INTO saves (id, save_name, seed, actor_pos_x, actor_pos_y, game_timer, inventory)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO saves (id, save_name, seed, actor_pos_x, actor_pos_y, game_timer, inventory, progress)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             ON DUPLICATE KEY UPDATE
             save_name = VALUES(save_name),
             seed = VALUES(seed),
             actor_pos_x = VALUES(actor_pos_x),
             actor_pos_y = VALUES(actor_pos_y),
             game_timer = VALUES(game_timer),
-            inventory = VALUES(inventory)
+            inventory = VALUES(inventory),
             progress = VALUES(progress)
         """
         save_name = f"Slot {save_id}"
-        cursor.execute(query, (save_id, save_name, seed, actor_pos[0], actor_pos[1], game_timer, inventory_str))
+        cursor.execute(query, (save_id, save_name, seed, actor_pos[0], actor_pos[1], game_timer, inventory_str, player_stats_str))
 
         # Update the discovered_<slot> column for the current seed
         discovered_column = f"discovered_{save_id}"
@@ -248,7 +248,7 @@ def load_game_from_db(save_id):
 
         # Load the game state
         query = """
-            SELECT seed, actor_pos_x, actor_pos_y, game_timer, inventory
+            SELECT seed, actor_pos_x, actor_pos_y, game_timer, inventory, progress
             FROM saves
             WHERE id = %s
         """
@@ -256,7 +256,7 @@ def load_game_from_db(save_id):
         cursor.execute(query, (save_id,))
         result = cursor.fetchone()
         if result:
-            seed, actor_pos_x, actor_pos_y, game_timer, inventory_str,player_stats_str = result
+            seed, actor_pos_x, actor_pos_y, game_timer, inventory_str, player_stats_str = result
             inventory = inventory_str.split(",") if inventory_str else []
             player_stats = json.loads(player_stats_str) if player_stats_str else {
                 "hp": 100,
@@ -283,10 +283,10 @@ def load_game_from_db(save_id):
             return seed, [actor_pos_x, actor_pos_y], game_timer, inventory, objects, player_stats
         else:
             print(f"No save found for slot ID: {save_id}")
-            return None, [0, 0], 0, [], []
+            return None, [0, 0], 0, [], [], {}
     except mysql.connector.Error as err:
         print(f"Error loading game: {err}")
-        return None, [0, 0], 0, [], []
+        return None, [0, 0], 0, [], [], {}
     finally:
         if connection and connection.is_connected():
             cursor.close()

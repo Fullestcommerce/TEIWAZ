@@ -239,9 +239,6 @@ def exploration_window(location_name, inventory, player_stats):
     player_speed = 3  # Movement speed
     rotation_speed = 0.05  # Rotation speed
     shield_regen_rate = 0.1  # Shield regeneration per frame
-    player_ammo = 10  # Ammo for Gun
-    railgun_bolts = 5  # Ammo for Railgun
-    shotgun_shells = 8  # Ammo for Shotgun
     shoot_cooldown = 0  # Cooldown timer for shooting
     current_weapon = "gun"  # Default weapon
     
@@ -411,47 +408,77 @@ def exploration_window(location_name, inventory, player_stats):
 
     def shoot():
         """Handle player shooting."""
-        nonlocal player_ammo, railgun_bolts, shotgun_shells
+        nonlocal player_ammo, railgun_bolts, shotgun_shells, player_shield
+        damage = 0
+        range_limit = max_depth  # Default range limit for weapons
+
         if current_weapon == "gun":
             if player_ammo > 0:
                 player_ammo -= 1
-                damage = 50
+                damage = 25
+                range_limit = max_depth  # No range limit for the gun
             else:
                 print("Out of ammo!")
                 return
         elif current_weapon == "railgun":
             if railgun_bolts > 0:
                 railgun_bolts -= 1
-                damage = 100
+                damage = 150
+                range_limit = max_depth  # No range limit for the railgun
             else:
                 print("Out of railgun bolts!")
                 return
         elif current_weapon == "shotgun":
             if shotgun_shells > 0:
                 shotgun_shells -= 1
-                damage = 75
+                damage = 50
+                range_limit = 300  # Shotgun range limit (in pixels)
+                spread_angle = math.radians(15)  # Spread angle for multishot
+                num_pellets = 5  # Number of pellets
             else:
                 print("Out of shotgun shells!")
                 return
         elif current_weapon == "power_fist":
-            damage = 30  # Power fist doesn't require ammo
+            damage = 50  # Power fist doesn't require ammo
+            range_limit = 100  # Power fist range limit (in pixels)
+            player_shield = min(player_shield + 10, 50)  # Regenerate 10 shield points
         else:
             print("No weapon selected!")
             return
 
         # Apply damage to enemies in line of sight
         enemies_to_remove = []  # Track enemies to remove after the loop
-        for enemy in enemies:
-            dx = enemy["x"] - player_x
-            dy = enemy["y"] - player_y
-            distance = math.sqrt(dx ** 2 + dy ** 2)
 
-            # Check if the enemy is in the player's line of sight
-            if is_visible(enemy["x"], enemy["y"]) and distance < max_depth:
-                enemy["hp"] -= damage
-                if enemy["hp"] <= 0:
-                    enemies_to_remove.append(enemy)
-                    print(f"Enemy {enemy['type']} defeated!")
+        if current_weapon == "shotgun":
+            # Multishot logic for shotgun
+            for pellet in range(num_pellets):
+                pellet_angle = player_angle - (spread_angle / 2) + (pellet * spread_angle / (num_pellets - 1))
+                for enemy in enemies:
+                    dx = enemy["x"] - player_x
+                    dy = enemy["y"] - player_y
+                    distance = math.sqrt(dx ** 2 + dy ** 2)
+                    angle_to_enemy = math.atan2(dy, dx)
+                    angle_diff = (angle_to_enemy - pellet_angle + math.pi) % (2 * math.pi) - math.pi
+
+                    # Check if the enemy is in the pellet's line of sight and within range
+                    if abs(angle_diff) < math.radians(5) and distance <= range_limit and is_visible(enemy["x"], enemy["y"]):
+                        enemy["hp"] -= damage
+                        if enemy["hp"] <= 0:
+                            enemies_to_remove.append(enemy)
+                            print(f"Enemy {enemy['type']} defeated by shotgun pellet!")
+        else:
+            # Single-shot logic for other weapons
+            for enemy in enemies:
+                dx = enemy["x"] - player_x
+                dy = enemy["y"] - player_y
+                distance = math.sqrt(dx ** 2 + dy ** 2)
+
+                # Check if the enemy is in the player's line of sight and within range
+                if distance <= range_limit and is_visible(enemy["x"], enemy["y"]):
+                    enemy["hp"] -= damage
+                    if enemy["hp"] <= 0:
+                        enemies_to_remove.append(enemy)
+                        print(f"Enemy {enemy['type']} defeated!")
 
         # Remove defeated enemies after the loop to avoid modifying the list while iterating
         for enemy in enemies_to_remove:
