@@ -196,7 +196,7 @@ def move_actor(actor_pos, target, world_map):
 
 
 
-def save_game_to_db(save_id, seed, actor_pos, game_timer, inventory, objects):
+def save_game_to_db(save_id, seed, actor_pos, game_timer, inventory, objects, player_stats=None):
     connection = get_db_connection()
     try:
         if isinstance(save_id, str) and save_id.startswith("Slot "):
@@ -204,7 +204,7 @@ def save_game_to_db(save_id, seed, actor_pos, game_timer, inventory, objects):
         cursor = connection.cursor()
 
         inventory_str = ",".join(inventory)
-
+        player_stats_str = json.dumps(player_stats)  # Save player stats as JSON
         # Save the game state
         query = """
             INSERT INTO saves (id, save_name, seed, actor_pos_x, actor_pos_y, game_timer, inventory)
@@ -216,6 +216,7 @@ def save_game_to_db(save_id, seed, actor_pos, game_timer, inventory, objects):
             actor_pos_y = VALUES(actor_pos_y),
             game_timer = VALUES(game_timer),
             inventory = VALUES(inventory)
+            progress = VALUES(progress)
         """
         save_name = f"Slot {save_id}"
         cursor.execute(query, (save_id, save_name, seed, actor_pos[0], actor_pos[1], game_timer, inventory_str))
@@ -239,6 +240,7 @@ def save_game_to_db(save_id, seed, actor_pos, game_timer, inventory, objects):
             connection.close()
 
 
+
 def load_game_from_db(save_id):
     connection = get_db_connection()
     try:
@@ -254,9 +256,16 @@ def load_game_from_db(save_id):
         cursor.execute(query, (save_id,))
         result = cursor.fetchone()
         if result:
-            seed, actor_pos_x, actor_pos_y, game_timer, inventory_str = result
+            seed, actor_pos_x, actor_pos_y, game_timer, inventory_str,player_stats_str = result
             inventory = inventory_str.split(",") if inventory_str else []
-
+            player_stats = json.loads(player_stats_str) if player_stats_str else {
+                "hp": 100,
+                "shield": 50,
+                "ammo": 10,
+                "railgun_bolts": 5,
+                "shotgun_shells": 8,
+                "current_weapon": "gun"
+            }
             # Update the discovered column for the current seed
             discovered_column = f"discovered_{save_id}"
             query = f"""
@@ -271,7 +280,7 @@ def load_game_from_db(save_id):
             objects = load_objects_from_db(seed)
 
             print(f"Data loaded: seed={seed}, actor_pos={[actor_pos_x, actor_pos_y]}, game_timer={game_timer}, inventory={inventory}")
-            return seed, [actor_pos_x, actor_pos_y], game_timer, inventory, objects
+            return seed, [actor_pos_x, actor_pos_y], game_timer, inventory, objects, player_stats
         else:
             print(f"No save found for slot ID: {save_id}")
             return None, [0, 0], 0, [], []

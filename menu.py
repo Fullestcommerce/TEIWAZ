@@ -206,16 +206,25 @@ def finished_game_menu(screen, clock, FPS, score):
 
 
 
-def exploration_window(location_name):
+def exploration_window(location_name, inventory, player_stats):
     pygame.init()
     screen_width, screen_height = 800, 600
     exploration_screen = pygame.display.set_mode((screen_width, screen_height))
     pygame.display.set_caption(f"Exploring: {location_name}")
+    print(f"Entering exploration window for location: {location_name}")
+    print(f"Initial player stats: {player_stats}")
+    print(f"Initial inventory: {inventory}")
+
+    # Unpack player stats
+    player_hp = player_stats["hp"]
+    player_shield = player_stats["shield"]
+    player_ammo = player_stats["ammo"]
+    railgun_bolts = player_stats["railgun_bolts"]
+    shotgun_shells = player_stats["shotgun_shells"]
+    current_weapon = player_stats["current_weapon"]
 
     # Generate a random map
     map_width, map_height = 50, 50
-    num_rooms = 10
-    max_room_size, min_room_size = 10, 5
     game_map, rooms = generate_random_map(map_width, map_height, location_name)
 
     tile_size = 64  # Size of each map tile
@@ -229,15 +238,13 @@ def exploration_window(location_name):
     player_angle = 0  # Player's viewing angle
     player_speed = 3  # Movement speed
     rotation_speed = 0.05  # Rotation speed
-    player_hp = 100  # Player health
-    player_shield = 50  # Player shield
     shield_regen_rate = 0.1  # Shield regeneration per frame
     player_ammo = 10  # Ammo for Gun
     railgun_bolts = 5  # Ammo for Railgun
     shotgun_shells = 8  # Ammo for Shotgun
     shoot_cooldown = 0  # Cooldown timer for shooting
     current_weapon = "gun"  # Default weapon
-
+    
     # Enemy properties
     enemies = []
 
@@ -535,6 +542,16 @@ def exploration_window(location_name):
         pygame.display.flip()
         clock.tick(60)  # Limit to 60 FPS
 
+    # Update player stats before exiting
+    player_stats["hp"] = player_hp
+    player_stats["shield"] = player_shield
+    player_stats["ammo"] = player_ammo
+    player_stats["railgun_bolts"] = railgun_bolts
+    player_stats["shotgun_shells"] = shotgun_shells
+    player_stats["current_weapon"] = current_weapon
+
     # Restore the main game display
     pygame.display.set_mode((800, 600))
     pygame.display.set_caption("TEIWAZ v_0.1")
+
+    return inventory, player_stats

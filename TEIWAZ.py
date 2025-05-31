@@ -22,7 +22,7 @@ def main_loop(load_saved=False, save_name=None):
         # вибір сейв слоту(спочатку забув прописати і потім годину думав чому воно не працює)
         save_name = save_slot_menu(screen, clock, FPS, "Load")
         if save_name:
-            seed, actor_pos, game_timer, inventory, objects = load_game_from_db(save_name)
+            seed, actor_pos, game_timer, inventory, objects, player_stats = load_game_from_db(save_name)
             if seed is None:
                 print("No saved game found. Starting a new game.")
                 world, seed = create_world()
@@ -30,6 +30,14 @@ def main_loop(load_saved=False, save_name=None):
                 game_timer = 0
                 inventory = []
                 objects = []
+                player_stats = {
+                    "hp": 100,
+                    "shield": 50,
+                    "ammo": 10,
+                    "railgun_bolts": 5,
+                    "shotgun_shells": 8,
+                    "current_weapon": "gun"
+                }
             else:
                 world, seed = create_world(seed)
         else:
@@ -39,6 +47,14 @@ def main_loop(load_saved=False, save_name=None):
             game_timer = 0
             inventory = []
             objects = []
+            player_stats = {
+                "hp": 100,
+                "shield": 50,
+                "ammo": 10,
+                "railgun_bolts": 5,
+                "shotgun_shells": 8,
+                "current_weapon": "gun"
+            }
     else:
         world, seed = create_world()
         actor_pos = [0, 0]
@@ -46,6 +62,14 @@ def main_loop(load_saved=False, save_name=None):
         inventory = []  #ліст інвентаря(для того щоб легше вивантажити в БД)
         generate_structures(seed)  
         objects = load_objects_from_db(seed) 
+        player_stats = {
+            "hp": 100,
+            "shield": 50,
+            "ammo": 10,
+            "railgun_bolts": 5,
+            "shotgun_shells": 8,
+            "current_weapon": "gun"
+        }
 
     actor = pygame.image.load("assets/actor.png")
     actor_rect = actor.get_rect()
@@ -106,14 +130,17 @@ def main_loop(load_saved=False, save_name=None):
                             print(f"You have already explored the {closest_obj['type']} at ({closest_obj['x']}, {closest_obj['y']}).")
                         else:
                             if closest_obj["type"] != "extraction_point":
-                                interaction_result = f"You salvaged a {closest_obj['type']}!"
+                                interaction_result = f"You looted a {closest_obj['type']}!"
                                 inventory.append(closest_obj["type"])
                                 closest_obj["discovered"] = True  # Позначаємо об'єкт як досліджений
                                 mark_object_as_discovered(closest_obj["id"])  # Оновлюємо стан у базі даних
                                 print(interaction_result)
-
-                                # Виклик додаткового вікна дослідження
-                                exploration_window(closest_obj["type"])
+                                print(f"Entering location: {closest_obj['type']}")
+                                print(f"Player stats before entering: {player_stats}")
+                                print(f"Inventory before entering: {inventory}")
+                                inventory, player_stats = exploration_window(closest_obj["type"], inventory, player_stats)
+                                print(f"Player stats after exiting: {player_stats}")
+                                print(f"Inventory after exiting: {inventory}")
                             else:
                                 print("You reached the extraction point!")
                                 # Кінець гри
