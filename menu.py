@@ -581,7 +581,7 @@ def exploration_window(location_name, inventory, player_stats):
         if any(enemy["type"] == "core" for enemy in enemies):
             return #коли бос живий щит не регенерує(хитро)
 
-        max_shield = 0 if player_stats["player_level"] == 1 else 50 if player_stats["player_level"] < 4 else 100  # Max shield increases at level 4
+        max_shield = 0 if player_stats["player_level"] == 0 else 50 if player_stats["player_level"] < 4 else 100  # Max shield increases at level 4
         shield_regen_rate = 0.1 if player_stats["player_level"] < 4 else 0.2
         player_shield = min(player_shield + shield_regen_rate, max_shield)
 
