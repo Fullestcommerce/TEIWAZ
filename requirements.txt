@@ -1,0 +1,5 @@
+pygame>=2.1.0
+numpy>=1.22
+mysql-connector-python>=8.0.0
+perlin-noise>=1.12
+PyYAML>=6.0
