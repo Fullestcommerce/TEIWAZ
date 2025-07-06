@@ -24,7 +24,5 @@ The project showcases custom raycasting, procedural world generation, and advanc
    git clone https://github.com/your-username/teiwaz.git
    cd teiwaz
 2.Install requirements:
-  bash
+  ```bash
   pip install -r requirements.txt
-Start the game:
-  python main.py
