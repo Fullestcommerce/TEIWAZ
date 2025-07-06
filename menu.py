@@ -1,5 +1,19 @@
+import mysql.connector  #надалі не забувай імпортовувати бібліотеки
+import sys
+import random
 import pygame
+import math
+from logic import *
 
+
+WEAPON_LEVEL_REQUIREMENTS = {
+    "gun": 0,         
+    "railgun": 2,   
+    "shotgun": 3,     
+    "power_fist": 5   
+}
+
+#Нагадую, все працює на костилях і через зад, не лізь лишній раз в код меню
 def draw_text(screen, text, pos, font, color):
     text_surface = font.render(text, True, color)
     screen.blit(text_surface, pos)
@@ -9,9 +23,42 @@ def main_menu(screen, clock, FPS):
     running = True
     while running:
         screen.fill((0, 0, 0))
+        draw_text(screen, "Main Menu", (300, 100), font, (255, 255, 255))
+        draw_text(screen, "New Game", (300, 200), font, (255, 255, 255))
+        draw_text(screen, "Load Game", (300, 300), font, (255, 255, 255))
+        draw_text(screen, "Achievements", (300, 400), font, (255, 255, 255))
+        draw_text(screen, "Quit", (300, 500), font, (255, 255, 255))
 
-        draw_text(screen, "Launch", (100, 200), font, (255, 255, 255))
-        draw_text(screen, "End playtest", (100, 300), font, (255, 255, 255))
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_pos = event.pos
+                if 300 < mouse_pos[0] < 600 and 200 < mouse_pos[1] < 250:
+                    return "new_game"
+                if 300 < mouse_pos[0] < 600 and 300 < mouse_pos[1] < 350:
+                    return "load_game"
+                if 300 < mouse_pos[0] < 600 and 400 < mouse_pos[1] < 450:
+                    achievements_menu(screen, clock, FPS, [])  #купи хліб з висівками
+                if 300 < mouse_pos[0] < 600 and 500 < mouse_pos[1] < 550:
+                    pygame.quit()
+                    sys.exit()
+
+        pygame.display.flip()
+        clock.tick(FPS)
+
+def save_slot_menu(screen, clock, FPS, action):
+    font = pygame.font.Font(None, 74)
+    running = True
+    while running:
+        screen.fill((0, 0, 0))
+
+        draw_text(screen, f"Select Slot to {action}", (100, 100), font, (255, 255, 255))
+        draw_text(screen, "Slot 1", (100, 200), font, (255, 255, 255))
+        draw_text(screen, "Slot 2", (100, 300), font, (255, 255, 255))
+        draw_text(screen, "Slot 3", (100, 400), font, (255, 255, 255))
+        draw_text(screen, "Back", (100, 500), font, (255, 255, 255))
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -19,12 +66,683 @@ def main_menu(screen, clock, FPS):
 
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_pos = event.pos
-                if 100 < mouse_pos[0] < 300 and 200 < mouse_pos[1] < 250:
-                    print("launching playtest...")
-                    return "launch_game"
+                if 100 < mouse_pos[0] < 400 and 200 < mouse_pos[1] < 250:
+                    return 1
                 if 100 < mouse_pos[0] < 400 and 300 < mouse_pos[1] < 350:
-                    print("ending game")
-                    running = False
+                    return 2
+                if 100 < mouse_pos[0] < 400 and 400 < mouse_pos[1] < 450:
+                    return 3
+                if 100 < mouse_pos[0] < 400 and 500 < mouse_pos[1] < 550:
+                    return None
 
         pygame.display.flip()
         clock.tick(FPS)
+
+def pause_menu(screen, clock, FPS, action_callback=None):
+    font = pygame.font.Font(None, 74)
+    running = True
+    while running:
+        screen.fill((0, 0, 0))
+        draw_text(screen, "Pause Menu", (300, 100), font, (255, 255, 255))
+        draw_text(screen, "Resume", (300, 200), font, (255, 255, 255))
+        draw_text(screen, "Save Game", (300, 300), font, (255, 255, 255))
+        draw_text(screen, "Load Game", (300, 400), font, (255, 255, 255))
+        draw_text(screen, "Achievements", (300, 500), font, (255, 255, 255))
+        draw_text(screen, "Quit", (300, 600), font, (255, 255, 255))
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_pos = event.pos
+                if 300 < mouse_pos[0] < 600 and 200 < mouse_pos[1] < 250:  
+                    return
+                if 300 < mouse_pos[0] < 600 and 300 < mouse_pos[1] < 350:  
+                    if action_callback:
+                        slot = save_slot_menu(screen, clock, FPS, "Save")  
+                        if slot:
+                            action_callback("save_game", slot)  
+                    return
+                if 300 < mouse_pos[0] < 600 and 400 < mouse_pos[1] < 450:  
+                    if action_callback:
+                        action_callback("load_game")
+                    return
+                if 300 < mouse_pos[0] < 600 and 500 < mouse_pos[1] < 550:
+                    achievements_menu(screen, clock, FPS, [])  #Підзагрузка ачівок(не забувай специфічну структуру)
+                if 300 < mouse_pos[0] < 600 and 600 < mouse_pos[1] < 650:  #вихід(чомусь працює 50/50. Фіксити через мій труп)
+                    pygame.quit()
+                    sys.exit()
+
+        pygame.display.flip()
+        clock.tick(FPS)
+
+#наступний код має бути в логіці, але я оголошую протест здоровому глузду
+def achievements_menu(screen, clock, FPS, achievements):
+    font = pygame.font.Font(None, 36)
+    running = True
+
+    #завантаження ачівок з БД
+    unlocked_achievements = load_achievements_from_db()
+    all_achievements = list(set(unlocked_achievements + achievements)) 
+
+    while running:
+        screen.fill((0, 0, 0)) 
+        draw_text(screen, "Achievements", (300, 50), font, (255, 255, 255))
+
+        if all_achievements:
+            #показ ачівок(виявляється :D це теж треба прописувати щоб воно працювало)
+            for i, achievement in enumerate(all_achievements):
+                draw_text(screen, achievement, (50, 100 + i * 40), font, (255, 0, 0))
+        else:
+            draw_text(screen, "No achievements yet.", (300, 200), font, (255, 255, 255))
+
+        draw_text(screen, "Press ESC to return", (300, 500), font, (255, 255, 255))
+
+        pygame.display.flip()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                running = False
+
+def finished_game_menu(screen, clock, FPS, score):
+    font = pygame.font.Font(None, 74)
+    running = True
+    while running:
+        screen.fill((0, 0, 0))
+        draw_text(screen, "Game Over", (300, 100), font, (255, 255, 255))
+        draw_text(screen, f"Score: {score}", (300, 200), font, (255, 255, 255))
+        draw_text(screen, "Main Menu", (300, 300), font, (255, 255, 255))
+        draw_text(screen, "Quit", (300, 400), font, (255, 255, 255))
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_pos = event.pos
+                if 300 < mouse_pos[0] < 600 and 300 < mouse_pos[1] < 350:  
+                    return "main_menu"
+                if 300 < mouse_pos[0] < 600 and 400 < mouse_pos[1] < 450:
+                    pygame.quit()
+                    sys.exit()
+
+        pygame.display.flip()
+        clock.tick(FPS)
+
+
+    while running:
+        screen.fill((0, 0, 0))
+        draw_text(screen, "Login", (300, 100), font, (255, 255, 255))
+        draw_text(screen, "Username:", (100, 200), input_font, (255, 255, 255))
+        draw_text(screen, username, (300, 200), input_font, (255, 255, 255))
+        draw_text(screen, "Password:", (100, 300), input_font, (255, 255, 255))
+        draw_text(screen, "*" * len(password), (300, 300), input_font, (255, 255, 255))
+        draw_text(screen, "Press ENTER to Login", (200, 400), input_font, (255, 255, 255))
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN:  #ENTER ЛОГІН 
+                    if validate_login(username, password):
+                        print("Login successful!")
+                        return True
+                    else:
+                        print("Invalid username or password.")
+                        username = ""
+                        password = ""
+                elif event.key == pygame.K_TAB:  #Роблю управління на кнопках
+                    active_input = "password" if active_input == "username" else "username"
+                elif event.key == pygame.K_BACKSPACE:  # щоб було видно що я вмію так
+                    if active_input == "username":
+                        username = username[:-1]
+                    else:
+                        password = password[:-1]
+                else: 
+                    if active_input == "username":
+                        username += event.unicode
+                    else:
+                        password += event.unicode
+
+        pygame.display.flip()
+        clock.tick(FPS)
+
+
+
+def exploration_window(location_name, inventory, player_stats):
+    pygame.init()
+    screen_width, screen_height = 800, 600
+    exploration_screen = pygame.display.set_mode((screen_width, screen_height))
+    pygame.display.set_caption(f"Exploring: {location_name}")
+    print(f"Entering exploration window for location: {location_name}")
+    print(f"Initial player stats: {player_stats}")
+    print(f"Initial inventory: {inventory}")
+
+    #розпаковка статусу гравця
+    player_hp = player_stats["hp"]
+    player_shield = player_stats["shield"]
+    player_ammo = player_stats["ammo"]
+    railgun_bolts = player_stats["railgun_bolts"]
+    shotgun_shells = player_stats["shotgun_shells"]
+    current_weapon = player_stats["current_weapon"]
+    artifacts = player_stats.get("artifacts", 0)
+
+    # генерація карти
+    map_width, map_height = 50, 50
+    game_map, rooms = generate_random_map(map_width, map_height, location_name)
+
+    tile_size = 64  # розмір не має значення
+    fov = math.pi / 3  #не лізь, уб'є
+    num_rays = 120  #промені рейкасту
+    max_depth = 2000  #відстань рендеру
+    ray_step = fov / num_rays  #кут між променями
+
+    #властивості граця
+    player_x, player_y = rooms[0][0] * tile_size + tile_size // 2, rooms[0][1] * tile_size + tile_size // 2  # Start in the first room
+    player_angle = 0 
+    player_speed = 3  
+    rotation_speed = 0.05  
+
+    def update_player_speed():
+        """Update the player's movement speed based on their level."""
+        nonlocal player_speed
+        if player_stats["player_level"] >= 6:
+            player_speed = 6  
+        else:
+            player_speed = 3  
+
+
+    enemies = []
+
+    
+    pickups = [] 
+
+    def spawn_enemies():
+        """Spawn enemies based on the location type."""
+        enemy_config = LOCATION_PROPERTIES[location_name]["enemies"]
+        for enemy_type, count in enemy_config:
+            for _ in range(count):
+                while True:
+                    x = random.randint(1, map_width - 2)
+                    y = random.randint(1, map_height - 2)
+                    if game_map[y][x] == 0: 
+                        enemies.append({
+                            "type": enemy_type,
+                            "x": x * tile_size + tile_size // 2,
+                            "y": y * tile_size + tile_size // 2,
+                            "hp": 50 if enemy_type == "drone" else 100 if enemy_type == "robot" else 150,
+                            "speed": 4 if enemy_type == "drone" else 2 if enemy_type == "robot" else 1,
+                            "attack_range": 3 if enemy_type == "drone" else 5 if enemy_type == "robot" else 3,
+                            "damage": 10 if enemy_type == "drone" else 20 if enemy_type == "robot" else 30,
+                            "aggro_range": 10 * tile_size,  
+                            "min_distance": 2 * tile_size,  
+                            "attack_cooldown": 0, 
+                            "sprite": pygame.image.load(f"assets/{enemy_type}.png")  #багана фігня
+                        })
+                        break
+
+        #спавн боса
+        if location_name == "extraction_point":
+            while True:
+                x = random.randint(1, map_width - 2)
+                y = random.randint(1, map_height - 2)
+                if game_map[y][x] == 0: 
+                    enemies.append({
+                        "type": "core",
+                        "x": x * tile_size + tile_size // 2,
+                        "y": y * tile_size + tile_size // 2,
+                        "hp": 500,  # хп боса
+                        "speed": 1, 
+                        "attack_range": 5, 
+                        "damage": 50,  
+                        "aggro_range": 15 * tile_size, 
+                        "min_distance": 3 * tile_size,  
+                        "attack_cooldown": 0, 
+                        "sprite": pygame.image.load("assets/core.png")  
+                    })
+                    break
+
+    def spawn_pickups():
+        """Spawn pick-ups based on the location type."""
+        pickup_config = LOCATION_PROPERTIES[location_name]["pickups"]
+        for pickup_type, count in pickup_config:
+            for _ in range(count):
+                while True:
+                    x = random.randint(1, map_width - 2)
+                    y = random.randint(1, map_height - 2)
+                    if game_map[y][x] == 0: 
+                        pickups.append({
+                            "type": pickup_type,
+                            "x": x * tile_size + tile_size // 2,
+                            "y": y * tile_size + tile_size // 2
+                        })
+                        break
+
+    def is_visible(x, y, player_x, player_y, player_angle, fov, game_map, tile_size, max_depth):
+        """Check if a point (x, y) is visible to the player using raycasting."""
+        dx = x - player_x
+        dy = y - player_y
+        distance = math.sqrt(dx ** 2 + dy ** 2)
+        angle_to_point = math.atan2(dy, dx)
+        angle_diff = (angle_to_point - player_angle + math.pi) % (2 * math.pi) - math.pi
+
+        if -fov / 2 <= angle_diff <= fov / 2 and distance < max_depth:
+          
+            sin_a = math.sin(angle_to_point)
+            cos_a = math.cos(angle_to_point)
+            for depth in range(1, int(distance)):
+                target_x = int((player_x + cos_a * depth) / tile_size)
+                target_y = int((player_y + sin_a * depth) / tile_size)
+                if game_map[target_y][target_x] == 1:
+                    return False  
+            return True
+        return False
+
+    def cast_rays():
+        """Cast rays and render the 3D environment."""
+        for ray in range(num_rays):
+            ray_angle = player_angle - (fov / 2) + (ray * ray_step)
+            sin_a = math.sin(ray_angle)
+            cos_a = math.cos(ray_angle)
+
+            depth = 0
+            hit = False
+            while not hit and depth < max_depth:
+                depth += 1
+                target_x = int((player_x + cos_a * depth) / tile_size)
+                target_y = int((player_y + sin_a * depth) / tile_size)
+
+                if target_x < 0 or target_x >= len(game_map[0]) or target_y < 0 or target_y >= len(game_map):
+                    break  
+                if game_map[target_y][target_x] == 1:
+                    hit = True
+
+            #висота стін дурдому
+            if hit:
+                wall_height = int(screen_height / (depth * 0.01))
+                color = (255 - min(depth, 255), 255 - min(depth, 255), 255 - min(depth, 255))  # Darken with distance
+                pygame.draw.rect(exploration_screen, color, (ray * (screen_width // num_rays), (screen_height // 2) - (wall_height // 2), (screen_width // num_rays), wall_height))
+
+    
+        for enemy in enemies:
+            dx = enemy["x"] - player_x
+            dy = enemy["y"] - player_y
+            distance = math.sqrt(dx ** 2 + dy ** 2)
+
+            #чи видимий ворог(для рендеру)
+            if is_visible(enemy["x"], enemy["y"], player_x, player_y, player_angle, fov, game_map, tile_size, max_depth):
+                angle_to_enemy = math.atan2(dy, dx)
+                angle_diff = (angle_to_enemy - player_angle + math.pi) % (2 * math.pi) - math.pi
+                enemy_height = int(screen_height / (distance * 0.01))
+                enemy_screen_x = int((angle_diff + fov / 2) / fov * screen_width)
+                color = (255, 0, 0) if enemy["type"] == "drone" else (255, 165, 0) if enemy["type"] == "robot" else (0, 0, 255)
+                pygame.draw.rect(exploration_screen, color, (enemy_screen_x - 5, (screen_height // 2) - (enemy_height // 2), 10, enemy_height))
+
+    def render_pickups():
+        """Render pick-ups in the 3D view."""
+        for pickup in pickups:
+            dx = pickup["x"] - player_x
+            dy = pickup["y"] - player_y
+            distance = math.sqrt(dx ** 2 + dy ** 2)
+
+            if is_visible(pickup["x"], pickup["y"], player_x, player_y, player_angle, fov, game_map, tile_size, max_depth):
+                angle_to_pickup = math.atan2(dy, dx)
+                angle_diff = (angle_to_pickup - player_angle + math.pi) % (2 * math.pi) - math.pi
+                pickup_height = int(screen_height / (distance * 0.01))
+                pickup_screen_x = int((angle_diff + fov / 2) / fov * screen_width)
+                color = (0, 255, 0) if pickup["type"] == "heal" else (255, 255, 0) if pickup["type"] == "ammo" else (128, 0, 128)
+                pygame.draw.rect(exploration_screen, color, (pickup_screen_x - 5, (screen_height // 2) - (pickup_height // 2), 10, pickup_height))
+
+    def render_minimap():
+        """Render a top-down minimap in the top-right corner."""
+        minimap_scale = 4
+        minimap_width = map_width * minimap_scale
+        minimap_height = map_height * minimap_scale
+        minimap_surface = pygame.Surface((minimap_width, minimap_height))
+        minimap_surface.fill((50, 50, 50)) 
+
+        #рендер карти
+        for y in range(map_height):
+            for x in range(map_width):
+                color = (200, 200, 200) if game_map[y][x] == 1 else (0, 0, 0)
+                pygame.draw.rect(minimap_surface, color, (x * minimap_scale, y * minimap_scale, minimap_scale, minimap_scale))
+
+        #рендер граця на мінімапі
+        player_minimap_x = int(player_x / tile_size * minimap_scale)
+        player_minimap_y = int(player_y / tile_size * minimap_scale)
+        pygame.draw.circle(minimap_surface, (0, 255, 0), (player_minimap_x, player_minimap_y), 3)
+
+        #рендер ворогів на мінімапі
+        for enemy in enemies:
+            enemy_minimap_x = int(enemy["x"] / tile_size * minimap_scale)
+            enemy_minimap_y = int(enemy["y"] / tile_size * minimap_scale)
+            color = (255, 0, 0) if enemy["type"] == "drone" else (255, 165, 0) if enemy["type"] == "robot" else (0, 0, 255)
+            pygame.draw.circle(minimap_surface, color, (enemy_minimap_x, enemy_minimap_y), 3)
+
+        #рендер pick-up'ів на мінімапі
+        for pickup in pickups:
+            pickup_minimap_x = int(pickup["x"] / tile_size * minimap_scale)
+            pickup_minimap_y = int(pickup["y"] / tile_size * minimap_scale)
+            color = (0, 255, 0) if pickup["type"] == "heal" else (255, 255, 0) if pickup["type"] == "ammo" else (128, 0, 128)
+            pygame.draw.circle(minimap_surface, color, (pickup_minimap_x, pickup_minimap_y), 3)
+
+        #обновлення мінімапи
+        exploration_screen.blit(minimap_surface, (screen_width - minimap_width - 10, 10))
+        #карта карта карта
+    def update_enemies():
+        """Update enemy positions and behavior."""
+        for enemy in enemies:
+            dx = player_x - enemy["x"]
+            dy = player_y - enemy["y"]
+            distance = math.sqrt(dx ** 2 + dy ** 2)
+
+            if distance < enemy["aggro_range"] and distance > enemy["min_distance"]:
+                enemy_pos = (int(enemy["x"] / tile_size), int(enemy["y"] / tile_size))
+                player_pos = (int(player_x / tile_size), int(player_y / tile_size))
+
+                path = a_star_search(game_map, enemy_pos, player_pos)
+
+                if path:
+                    next_step = path[0]
+                    new_x = next_step[0] * tile_size + tile_size // 2
+                    new_y = next_step[1] * tile_size + tile_size // 2
+
+                    angle = math.atan2(new_y - enemy["y"], new_x - enemy["x"])
+                    enemy["x"] += math.cos(angle) * enemy["speed"]
+                    enemy["y"] += math.sin(angle) * enemy["speed"]
+
+            #для того щоб шайтани атакували гравця
+            if distance <= enemy["attack_range"] * tile_size and enemy["attack_cooldown"] <= 0:
+                nonlocal player_hp, player_shield
+                if player_shield > 0:
+                    player_shield -= enemy["damage"]
+                    if player_shield < 0:
+                        player_hp += player_shield  
+                        player_shield = 0
+                else:
+                    player_hp -= enemy["damage"]
+                enemy["attack_cooldown"] = 60  #кулдаун шайтанів
+
+        for enemy in enemies:
+            if enemy["attack_cooldown"] > 0:
+                enemy["attack_cooldown"] -= 1
+    def collect_pickups():
+        """Check if the player collects any pick-ups."""
+        nonlocal player_hp, player_ammo, railgun_bolts, shotgun_shells, artifacts
+        pickups_to_remove = []  #видалення підібраних об'єктів
+        for pickup in pickups:
+            dx = pickup["x"] - player_x
+            dy = pickup["y"] - player_y
+            distance = math.sqrt(dx ** 2 + dy ** 2)
+
+            if distance < tile_size: 
+                if pickup["type"] == "heal":
+                    player_hp = min(player_hp + 25, 100) 
+                    print("Collected a heal! HP restored.")
+                elif pickup["type"] == "ammo":
+                    player_ammo += 10
+                    railgun_bolts += 1
+                    shotgun_shells += 4
+                    print("Collected ammo! Ammo increased.")
+                elif pickup["type"] == "artifact":
+                    artifacts += 1 
+                    player_stats["artifacts"] = artifacts
+                    update_player_level(player_stats)  
+                    print("Collected an artifact!")
+                pickups_to_remove.append(pickup)
+
+        for pickup in pickups_to_remove:
+            pickups.remove(pickup)
+    def shoot():
+        """Handle player shooting."""
+        nonlocal player_ammo, railgun_bolts, shotgun_shells, player_shield
+        damage = 0
+        range_limit = max_depth  #ліміт проникнення
+
+        if current_weapon == "gun":
+            if player_ammo > 0:
+                player_ammo -= 1
+                damage = 25
+                range_limit = 500  
+            else:
+                print("Out of ammo!")
+                return
+        elif current_weapon == "railgun":
+            if railgun_bolts > 0:
+                railgun_bolts -= 1
+                damage = 150
+                range_limit = max_depth 
+            else:
+                print("Out of railgun bolts!")
+                return
+        elif current_weapon == "shotgun":
+            if shotgun_shells > 0:
+                shotgun_shells -= 1
+                damage = 50
+                range_limit = 300 
+                spread_angle = math.radians(15)
+                num_pellets = 5  
+            else:
+                print("Out of shotgun shells!")
+                return
+        elif current_weapon == "power_fist":
+            damage = 50 
+            range_limit = 100 
+            player_shield = min(player_shield + 10, 50) 
+        else:
+            print("No weapon selected!")
+            return
+
+       
+        enemies_to_remove = []  
+
+        if current_weapon == "shotgun":
+            #логіка мультишоту
+            for pellet in range(num_pellets):
+                pellet_angle = player_angle - (spread_angle / 2) + (pellet * spread_angle / (num_pellets - 1))
+                for enemy in enemies:
+                    dx = enemy["x"] - player_x
+                    dy = enemy["y"] - player_y
+                    distance = math.sqrt(dx ** 2 + dy ** 2)
+                    angle_to_enemy = math.atan2(dy, dx)
+                    angle_diff = (angle_to_enemy - pellet_angle + math.pi) % (2 * math.pi) - math.pi
+
+                    if abs(angle_diff) < math.radians(5) and distance <= range_limit and is_visible(enemy["x"], enemy["y"], player_x, player_y, player_angle, fov, game_map, tile_size, max_depth):
+                        enemy["hp"] -= damage
+                        if enemy["hp"] <= 0 and enemy not in enemies_to_remove:
+                            enemies_to_remove.append(enemy)
+                            print(f"Enemy {enemy['type']} defeated by shotgun pellet!")
+        else:
+            for enemy in enemies:
+                dx = enemy["x"] - player_x
+                dy = enemy["y"] - player_y
+                distance = math.sqrt(dx ** 2 + dy ** 2)
+
+                if distance <= range_limit and is_visible(enemy["x"], enemy["y"], player_x, player_y, player_angle, fov, game_map, tile_size, max_depth):
+                    enemy["hp"] -= damage
+                    if enemy["hp"] <= 0 and enemy not in enemies_to_remove:
+                        enemies_to_remove.append(enemy) 
+                        print(f"Enemy {enemy['type']} defeated!")
+
+        for enemy in enemies_to_remove:
+            enemies.remove(enemy)
+
+        #взагалі це непотрібно, але я залишу
+        shoot_cooldown = 30
+
+    def update_shield():
+        """Regenerate the player's shield."""
+        nonlocal player_shield
+        if any(enemy["type"] == "core" for enemy in enemies):
+            return #коли бос живий щит не регенерує(хитро)
+
+        max_shield = 0 if player_stats["player_level"] == 0 else 50 if player_stats["player_level"] < 4 else 100  # Max shield increases at level 4
+        shield_regen_rate = 0.1 if player_stats["player_level"] < 4 else 0.2
+        player_shield = min(player_shield + shield_regen_rate, max_shield)
+
+    def switch_weapon(weapon_name):
+        """Switch to a weapon if the player meets the level requirement."""
+        required_level = WEAPON_LEVEL_REQUIREMENTS.get(weapon_name, 0)
+        if player_stats["player_level"] >= required_level:
+            nonlocal current_weapon
+            current_weapon = weapon_name
+            print(f"Switched to {weapon_name}.")
+        else:
+            print(f"{weapon_name.capitalize()} is locked! Requires level {required_level}.")
+
+    def are_enemies_present(enemies):
+        return len(enemies) > 0
+
+    #спавнить шайтанів і іншу хрінь
+    spawn_enemies()
+    spawn_pickups()
+    update_player_speed()
+    running = True
+    clock = pygame.time.Clock()
+
+    while running:
+        exploration_screen.fill((0, 0, 0))  
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:  
+                    if are_enemies_present(enemies):
+                        print("Enemies will chase you if you exit now!")
+                    else:
+                        running = False
+                if event.key == pygame.K_SPACE:  #АГОНЬ ПА БЛЯДСКОМУ ХУТОРУ!
+                    shoot()
+                if event.key == pygame.K_1:
+                    switch_weapon("gun")
+                if event.key == pygame.K_2:
+                    switch_weapon("railgun")
+                if event.key == pygame.K_3:
+                    switch_weapon("shotgun")
+                if event.key == pygame.K_4:
+                    switch_weapon("power_fist")
+
+        keys = pygame.key.get_pressed()
+        new_x, new_y = player_x, player_y
+        if keys[pygame.K_w]:  #вперід і тільки вперід
+            new_x += math.cos(player_angle) * player_speed
+            new_y += math.sin(player_angle) * player_speed
+        if keys[pygame.K_s]:  #назад і тільки назад
+            new_x -= math.cos(player_angle) * player_speed
+            new_y -= math.sin(player_angle) * player_speed
+        if keys[pygame.K_LEFT]:  #стрейф(переплутаний напрямок. але це фіча)
+            new_x -= math.sin(player_angle) * player_speed
+            new_y += math.cos(player_angle) * player_speed
+        if keys[pygame.K_RIGHT]:  # стрейф(переплутаний напрямок. але це фіча)
+            new_x += math.sin(player_angle) * player_speed
+            new_y -= math.cos(player_angle) * player_speed
+
+        if game_map[int(new_y / tile_size)][int(new_x / tile_size)] == 0:
+            player_x, player_y = new_x, new_y
+
+        if keys[pygame.K_a]:  #baby spin me right round, baby right round
+            player_angle -= rotation_speed
+        if keys[pygame.K_d]:  
+            player_angle += rotation_speed
+        def render_locked_weapon_message(message):
+            """Display a message on the screen for locked weapons."""
+            font = pygame.font.Font(None, 36)
+            text = font.render(message, True, (255, 0, 0))
+            exploration_screen.blit(text, (10, 220))
+
+        def render_enemies(enemies, player_x, player_y, player_angle, fov, screen_width, screen_height, exploration_screen):
+            """Render enemies in the 3D view."""
+            for enemy in enemies:
+                dx = enemy["x"] - player_x
+                dy = enemy["y"] - player_y
+                distance = math.sqrt(dx ** 2 + dy ** 2)
+
+                if is_visible(enemy["x"], enemy["y"], player_x, player_y, player_angle, fov, game_map, tile_size, max_depth):
+                    angle_to_enemy = math.atan2(dy, dx)
+                    angle_diff = (angle_to_enemy - player_angle + math.pi) % (2 * math.pi) - math.pi
+                    enemy_height = int(screen_height / (distance * 0.01))
+                    enemy_screen_x = int((angle_diff + fov / 2) / fov * screen_width)
+                    #скейл спрайтів(працює по принципу проекції)
+                    scaled_sprite = pygame.transform.scale(enemy["sprite"], (enemy_height, enemy_height))
+                    exploration_screen.blit(scaled_sprite, (enemy_screen_x - enemy_height // 2, (screen_height // 2) - (enemy_height // 2)))
+
+        #апдейти
+        update_shield()
+
+     
+        update_enemies()
+
+       
+        collect_pickups()
+
+        #ініціалізувати рейкатс і рендер
+        cast_rays()
+
+        render_enemies(enemies, player_x, player_y, player_angle, fov, screen_width, screen_height, exploration_screen)
+
+        render_pickups()
+
+        render_minimap()
+        if player_hp <= 0:
+            death_screen(exploration_screen, clock, 60)
+        font = pygame.font.Font(None, 36)
+        hp_text = font.render(f"HP: {player_hp}", True, (255, 0, 0))
+        shield_text = font.render(f"Shield: {int(player_shield)}", True, (0, 255, 255))
+        ammo_text = font.render(f"Ammo: {player_ammo}", True, (255, 255, 0))
+        railgun_text = font.render(f"Railgun Bolts: {railgun_bolts}", True, (255, 165, 0))
+        shotgun_text = font.render(f"Shotgun Shells: {shotgun_shells}", True, (255, 165, 0))
+        weapon_text = font.render(f"Weapon: {current_weapon.capitalize()}", True, (255, 255, 255))
+        exploration_screen.blit(hp_text, (10, 10))
+        exploration_screen.blit(shield_text, (10, 40))
+        exploration_screen.blit(ammo_text, (10, 70))
+        exploration_screen.blit(railgun_text, (10, 100))
+        exploration_screen.blit(shotgun_text, (10, 130))
+        exploration_screen.blit(weapon_text, (10, 160))
+
+        artifact_text = font.render(f"Artifacts: {artifacts}", True, (255, 255, 0))
+        exploration_screen.blit(artifact_text, (10, 190))
+
+        pygame.display.flip()
+        clock.tick(60)  
+
+    player_stats["hp"] = player_hp
+    player_stats["shield"] = player_shield
+    player_stats["ammo"] = player_ammo
+    player_stats["railgun_bolts"] = railgun_bolts
+    player_stats["shotgun_shells"] = shotgun_shells
+    player_stats["current_weapon"] = current_weapon
+    player_stats["artifacts"] = artifacts
+
+    pygame.display.set_mode((800, 600))
+    pygame.display.set_caption("TEIWAZ v_0.1")
+
+    return inventory, player_stats
+
+def death_screen(screen, clock, FPS):
+    """Display the death screen."""
+    font = pygame.font.Font(None, 74)
+    running = True
+    while running:
+        screen.fill((0, 0, 0))
+        draw_text(screen, "You Died", (300, 100), font, (255, 0, 0))
+        draw_text(screen, "Press ESC to Quit", (200, 300), font, (255, 255, 255))
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                pygame.quit()
+                sys.exit()
+
+        pygame.display.flip()
+        clock.tick(FPS)
+
+
+
